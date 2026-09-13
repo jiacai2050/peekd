@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Path}} - Peekd</title>
+    <link rel="stylesheet" href="/_zero_serve_assets/directory.css">
+</head>
+<body>
+    <main class="directory">
+        <header class="directory-header">
+            <div>
+                <p class="eyebrow">Peekd</p>
+                <h1>{{.Path}}</h1>
+            </div>
+            <span class="entry-count">{{len .Entries}} items</span>
+        </header>
+
+        <section class="file-list">
+            {{if .HasParent}}
+            <a class="file-row directory-row" href="{{.ParentURL}}">
+                <span class="file-icon">↩</span>
+                <span class="file-name">Parent directory</span>
+                <span class="file-meta">—</span>
+                <span class="file-date">—</span>
+            </a>
+            {{end}}
+            {{range .Entries}}
+            <a class="file-row{{if .IsDir}} directory-row{{end}}" href="{{.URL}}">
+                <span class="file-icon">{{.Icon}}</span>
+                <span class="file-name">{{.Name}}{{if .IsDir}}/{{end}}</span>
+                <span class="file-meta">{{.Size}}</span>
+                <span class="file-date">{{.Modified}}</span>
+            </a>
+            {{else}}
+            <div class="empty">This directory is empty.</div>
+            {{end}}
+        </section>
+        <footer class="site-footer">
+            <div>
+                <strong>Peekd</strong>
+                <small>Fast web file server with rich previews.</small>
+            </div>
+            <div class="footer-meta">
+                <small>{{.Version}} · Built with Go</small>
+                <a href="{{.ProjectURL}}" target="_blank" rel="noreferrer">GitHub</a>
+            </div>
+        </footer>
+    </main>
+</body>
+</html>

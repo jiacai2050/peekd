@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.FileName}} - Peekd</title>
+    <link rel="stylesheet" href="/_zero_serve_assets/preview.css">
+</head>
+<body>
+    <figure class="preview-container image-preview">
+        <div class="file-header">
+            <div class="file-heading">
+                <div class="file-name">🖼️ {{.FileName}}</div>
+                <div class="file-meta">
+                    <span>{{.Size}}</span>
+                    <span>Modified {{.Modified}}</span>
+                </div>
+            </div>
+            <a class="download-button" href="{{.RawURL}}" download>Download original</a>
+        </div>
+        <div class="image-frame">
+            <img src="{{.RawURL}}" alt="{{.FileName}}">
+        </div>
+        <figcaption class="site-footer">
+            <div>
+                <strong>Peekd</strong>
+                <small>Fast web file server with rich previews.</small>
+            </div>
+            <div class="footer-meta">
+                <small>{{.Version}} · Built with Go</small>
+                <a href="{{.ProjectURL}}" target="_blank" rel="noreferrer">GitHub</a>
+            </div>
+        </figcaption>
+    </figure>
+</body>
+</html>
