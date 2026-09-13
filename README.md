@@ -6,6 +6,12 @@ previews for text, code, images, audio, and video, resumable downloads through
 HTTP byte ranges, and direct file delivery that can use Go's `sendfile`
 optimization with minimal user-space copying.
 
+![](./demo.webp)
+
+| Directory | Text Preview |
+| :---: | :---: |
+| ![](screenshots/directory.webp) | ![](screenshots/preview-text.web) |
+
 ## Installation
 
 ### One-liner (Linux & macOS)
