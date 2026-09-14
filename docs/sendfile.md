@@ -29,11 +29,11 @@ read and rendered as HTML. Image, audio, and video preview pages also require
 template rendering, so the preview pages themselves do not use zero-copy
 transfer.
 
-Requesting a raw file with `raw=1` uses the direct file-serving path:
+Direct file URLs use the direct file-serving path:
 
 ```bash
 curl -o large-file.iso \
-  'http://127.0.0.1:8090/large-file.iso?raw=1'
+  'http://127.0.0.1:8090/large-file.iso'
 ```
 
 ## Verify on Linux

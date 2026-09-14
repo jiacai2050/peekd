@@ -17,7 +17,7 @@ import (
 
 var testEmbeddedFiles = fstest.MapFS{
 	"assets/text.html":      {Data: []byte("<!doctype html><body>{{range .Lines}}{{.}}\n{{end}}</body>")},
-	"assets/directory.html": {Data: []byte("<!doctype html><body><a href=\"/\">Peekd</a>{{if .HasParent}}<a href=\"../\">Parent directory</a>{{end}}{{range .Entries}}<div class=\"entry\">{{.Name}}|{{.FileModeBits}}|{{.Modified}}</div>{{end}}</body>")},
+	"assets/directory.html": {Data: []byte("<!doctype html><body><a href=\"/\">Peekd</a>{{if .HasParent}}<a href=\"../\">Parent directory</a>{{end}}{{range .Entries}}<div class=\"entry\">{{.Name}}|{{.URL}}|{{.FileModeBits}}|{{.Modified}}</div>{{end}}</body>")},
 	"assets/image.html":     {Data: []byte("<!doctype html><body>image {{.FileName}}</body>")},
 	"assets/media.html":     {Data: []byte("<!doctype html><body>media {{.FileName}}</body>")},
 	"assets/markdown.html":  {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
@@ -61,28 +61,6 @@ func TestParseByteSize(t *testing.T) {
 			}
 			if got != test.want {
 				t.Fatalf("ParseByteSize(%q) = %d, want %d", test.input, got, test.want)
-			}
-		})
-	}
-}
-
-func TestIsBrowserUserAgent(t *testing.T) {
-	tests := []struct {
-		name      string
-		userAgent string
-		want      bool
-	}{
-		{name: "Chrome", userAgent: "Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36", want: true},
-		{name: "Firefox", userAgent: "Mozilla/5.0 Firefox/121.0", want: true},
-		{name: "Safari", userAgent: "Mozilla/5.0 Version/17.0 Safari/605.1.15", want: true},
-		{name: "curl", userAgent: "curl/8.5.0", want: false},
-		{name: "empty", want: false},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := isBrowserUserAgent(test.userAgent); got != test.want {
-				t.Fatalf("isBrowserUserAgent(%q) = %v, want %v", test.userAgent, got, test.want)
 			}
 		})
 	}
@@ -149,7 +127,7 @@ func TestContentDetectedTextFileIsPreviewed(t *testing.T) {
 
 	handler := mustNewHandler(t, rootDir, 4<<20)
 	request := httptest.NewRequest(http.MethodGet, "/notes", nil)
-	request.Header.Set("User-Agent", "Mozilla/5.0")
+	request.Header.Set("Sec-Fetch-Dest", "document")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
@@ -171,7 +149,7 @@ func TestContentDetectedImageFileIsPreviewed(t *testing.T) {
 
 	handler := mustNewHandler(t, rootDir, 4<<20)
 	request := httptest.NewRequest(http.MethodGet, "/image", nil)
-	request.Header.Set("User-Agent", "Mozilla/5.0")
+	request.Header.Set("Sec-Fetch-Dest", "document")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
@@ -193,7 +171,7 @@ func TestMarkdownPreviewForBrowserDisablesRawHTML(t *testing.T) {
 
 	handler := mustNewHandler(t, rootDir, 4<<20)
 	request := httptest.NewRequest(http.MethodGet, "/README.md", nil)
-	request.Header.Set("User-Agent", "Mozilla/5.0")
+	request.Header.Set("Sec-Fetch-Dest", "document")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
@@ -213,7 +191,7 @@ func TestMarkdownPreviewForBrowserDisablesRawHTML(t *testing.T) {
 	}
 }
 
-func TestMarkdownPreviewFallsBackToRawForNonBrowser(t *testing.T) {
+func TestMarkdownFileDefaultsToRaw(t *testing.T) {
 	rootDir := t.TempDir()
 	filePath := filepath.Join(rootDir, "README.markdown")
 	content := "# plain\n\ncontent\n"
@@ -222,8 +200,8 @@ func TestMarkdownPreviewFallsBackToRawForNonBrowser(t *testing.T) {
 	}
 
 	handler := mustNewHandler(t, rootDir, 4<<20)
-	request := httptest.NewRequest(http.MethodGet, "/README.markdown", nil)
-	request.Header.Set("User-Agent", "curl/8.5.0")
+	request := httptest.NewRequest(http.MethodGet, "/README.markdown?raw=1", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
@@ -253,7 +231,6 @@ func TestDirectoryPreviewContainsParentAndRootLinksAndSecondPrecision(t *testing
 
 	handler := mustNewHandler(t, rootDir, 4<<20)
 	request := httptest.NewRequest(http.MethodGet, "/sub/", nil)
-	request.Header.Set("User-Agent", "Mozilla/5.0")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 
@@ -270,6 +247,9 @@ func TestDirectoryPreviewContainsParentAndRootLinksAndSecondPrecision(t *testing
 	}
 	if !strings.Contains(body, "-rw-------") {
 		t.Fatalf("expected file mode bits in directory preview, got %q", body)
+	}
+	if !strings.Contains(body, "/sub/entry.txt") {
+		t.Fatalf("expected directory entry URL, got %q", body)
 	}
 
 	re := regexp.MustCompile(`\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)

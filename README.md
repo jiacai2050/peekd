@@ -9,8 +9,7 @@ files.
 
 ## Highlights
 
-- Rich previews for Markdown, code, text, images, audio, and video in browsers;
-  `curl` and other clients receive original files directly
+- Rich previews for Markdown, code, text, images, audio, and video.
 - Fast direct file serving with HTTP range and [`sendfile`](docs/sendfile.md) support
 - Lightweight single binary with automatic dark mode
 
@@ -54,6 +53,10 @@ peekd -root ~/Downloads -addr :9000
 
 If the selected port is occupied, Peekd tries the next port automatically.
 
+Peekd uses the browser `Sec-Fetch-Dest` header to distinguish document
+navigation from subresource requests. Markdown images and media therefore load
+as original files without special query parameters.
+
 Change the maximum Markdown and text preview size:
 
 ```bash
@@ -88,4 +91,4 @@ go build ./...
 
 ## License
 
-MIT
+[MIT](./LICENSE)

@@ -94,7 +94,7 @@ func withAccessLog(handler http.Handler) http.Handler {
 		if response.status == 0 {
 			response.status = http.StatusOK
 		}
-		log.Printf("%s %s %d %d %s", r.Method, r.URL.Path, response.status, response.bytes, time.Since(start).Round(time.Microsecond))
+		log.Printf("%s %s %d %d %s", r.Method, r.URL.RequestURI(), response.status, response.bytes, time.Since(start).Round(time.Microsecond))
 	})
 }
 
@@ -273,10 +273,6 @@ func splitLines(content string) []string {
 		lines = lines[:len(lines)-1]
 	}
 	return lines
-}
-
-func isBrowserUserAgent(userAgent string) bool {
-	return strings.Contains(strings.ToLower(userAgent), "mozilla")
 }
 
 func ParseByteSize(value string) (int64, error) {
@@ -515,23 +511,24 @@ func NewHandler(config Config) (http.Handler, error) {
 			return
 		}
 
-		browserUserAgent := isBrowserUserAgent(r.UserAgent())
-		if !info.IsDir() && (r.URL.Query().Get("raw") == "1" || !browserUserAgent) {
+		if info.IsDir() {
+			renderDirectory(w, r, config.RootDir, cleanedPath, directoryTemplate, config.ProjectURL, config.Version)
+			return
+		}
+
+		if r.URL.Query().Get("raw") == "1" || r.Header.Get("Sec-Fetch-Dest") != "document" {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
 
-		preview := previewTypeNone
-		if !info.IsDir() {
-			preview = previewTypeByExtension(fullPath)
-			if preview == previewTypeNone {
-				contentType, detectErr := detectContentType(fullPath)
-				if detectErr != nil {
-					http.Error(w, "unable to inspect file", http.StatusInternalServerError)
-					return
-				}
-				preview = previewTypeByContent(contentType)
+		preview := previewTypeByExtension(fullPath)
+		if preview == previewTypeNone {
+			contentType, detectErr := detectContentType(fullPath)
+			if detectErr != nil {
+				http.Error(w, "unable to inspect file", http.StatusInternalServerError)
+				return
 			}
+			preview = previewTypeByContent(contentType)
 		}
 
 		switch preview {
@@ -622,11 +619,6 @@ func NewHandler(config Config) (http.Handler, error) {
 			if err := textTemplate.Execute(w, data); err != nil {
 				log.Printf("failed to render text preview %s: %v", r.URL.Path, err)
 			}
-			return
-		}
-
-		if info.IsDir() {
-			renderDirectory(w, r, config.RootDir, cleanedPath, directoryTemplate, config.ProjectURL, config.Version)
 			return
 		}
 
