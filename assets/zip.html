@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.FileName}} - Peekd</title>
+    <link rel="stylesheet" href="/__peekd_assets/preview.css">
+</head>
+<body>
+    <main class="preview-container">
+        <div class="file-header">
+            <div class="file-heading">
+                <div class="file-name">📦 {{.FileName}}</div>
+                <div class="file-meta">
+                    <span>{{len .Entries}} entries</span>
+                    <span>{{.Size}}</span>
+                    <span>Modified {{.Modified}}</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a class="download-button" href="./">Back to directory</a>
+                <a class="download-button" href="{{.RawURL}}" download>Download original</a>
+            </div>
+        </div>
+        <div class="archive-list">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Size</th>
+                        <th>Modified</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Entries}}
+                    <tr{{if .IsDir}} class="archive-directory"{{end}}>
+                        <td title="{{.Name}}">{{.Name}}</td>
+                        <td>{{.Size}}</td>
+                        <td>{{.Modified}}</td>
+                    </tr>
+                    {{else}}
+                    <tr><td colspan="3">This archive is empty.</td></tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        <footer class="site-footer">
+            <div>
+                <strong>Peekd</strong>
+                <small>Fast web file server with rich previews.</small>
+            </div>
+            <div class="footer-meta">
+                <small>{{.Version}}</small>
+                <a href="{{.ProjectURL}}" target="_blank" rel="noreferrer">GitHub</a>
+            </div>
+        </footer>
+    </main>
+</body>
+</html>

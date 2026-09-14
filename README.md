@@ -9,7 +9,8 @@ files.
 
 ## Highlights
 
-- Rich previews for Markdown, code, text, images, audio, video, and PDF.
+- Rich previews for Markdown, code, text, images, audio, video, PDF, and ZIP
+  archive listings.
 - Fast direct file serving with HTTP range and [`sendfile`](docs/sendfile.md) support
 - Lightweight single binary with automatic dark mode
 

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
-	"github.com/jiacai2050/peekd/internal/server"
+	"github.com/jiacai2050/peekd/internal"
 )
 
 //go:embed assets/*
@@ -23,7 +23,7 @@ func main() {
 	addr := flag.String("addr", ":8090", "HTTP server address")
 	maxTextPreviewSize := int64(4 << 20)
 	flag.Func("max-preview-size", "maximum text preview size (default 4M; e.g. 512K or 4194304)", func(value string) error {
-		parsed, err := server.ParseByteSize(value)
+		parsed, err := internal.ParseByteSize(value)
 		if err != nil {
 			return err
 		}
@@ -53,7 +53,7 @@ func main() {
 		log.Fatalf("failed to resolve root directory: %v", err)
 	}
 
-	if err := server.Run(server.Config{
+	if err := internal.Run(internal.Config{
 		RootDir:            absoluteRootDir,
 		Addr:               *addr,
 		MaxTextPreviewSize: maxTextPreviewSize,

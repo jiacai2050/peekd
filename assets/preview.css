@@ -78,6 +78,64 @@ pre {
     white-space: pre;
 }
 
+.archive-list {
+    overflow-x: auto;
+}
+
+.archive-list table {
+    border-collapse: collapse;
+    table-layout: fixed;
+    width: 100%;
+}
+
+.archive-list th,
+.archive-list td {
+    border-bottom: 1px solid #e5e7eb;
+    padding: 10px 16px;
+    overflow: hidden;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.archive-list th:first-child,
+.archive-list td:first-child {
+    width: 65%;
+}
+
+.archive-list th:nth-child(2),
+.archive-list td:nth-child(2) {
+    width: 15%;
+}
+
+.archive-list th:nth-child(3),
+.archive-list td:nth-child(3) {
+    width: 20%;
+}
+
+.archive-list th {
+    background: #f3f4f6;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.archive-list td:nth-child(2),
+.archive-list td:nth-child(3) {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.archive-list th:nth-child(2),
+.archive-list th:nth-child(3),
+.archive-list td:nth-child(2),
+.archive-list td:nth-child(3) {
+    text-align: right;
+}
+
+.archive-directory td:first-child {
+    font-weight: 600;
+}
+
 .code {
     counter-reset: line;
     overflow-x: auto;

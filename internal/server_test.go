@@ -1,6 +1,7 @@
-package server
+package internal
 
 import (
+	"archive/zip"
 	"io/fs"
 	"net"
 	"net/http"
@@ -22,6 +23,7 @@ var testEmbeddedFiles = fstest.MapFS{
 	"assets/media.html":     {Data: []byte("<!doctype html><body>media {{.FileName}}</body>")},
 	"assets/json.html":      {Data: []byte("<!doctype html><body>json {{.FileName}}<pre>{{.Content}}</pre></body>")},
 	"assets/pdf.html":       {Data: []byte("<!doctype html><body>pdf {{.FileName}} {{.RawURL}}</body>")},
+	"assets/zip.html":       {Data: []byte("<!doctype html><body>zip {{.FileName}} {{range .Entries}}{{.Name}}|{{.Size}}{{end}}</body>")},
 	"assets/markdown.html":  {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
 	"assets/preview.css":    {Data: []byte("body{}")},
 	"assets/directory.css":  {Data: []byte("body{}")},
@@ -206,6 +208,46 @@ func TestJSONFileIsFormatted(t *testing.T) {
 	}
 }
 
+func TestZIPFileListsEntries(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "bundle.zip")
+	file, err := os.Create(filePath)
+	if err != nil {
+		t.Fatalf("create ZIP file: %v", err)
+	}
+	writer := zip.NewWriter(file)
+	entry, err := writer.Create("docs/readme.txt")
+	if err != nil {
+		t.Fatalf("create ZIP entry: %v", err)
+	}
+	if _, err := entry.Write([]byte("hello")); err != nil {
+		t.Fatalf("write ZIP entry: %v", err)
+	}
+	if _, err := writer.Create("images/"); err != nil {
+		t.Fatalf("create ZIP directory: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close ZIP writer: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("close ZIP file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/bundle.zip", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	body := response.Body.String()
+	if !strings.Contains(body, "docs/readme.txt") || !strings.Contains(body, "images/") {
+		t.Fatalf("expected ZIP entries in preview, got %q", body)
+	}
+}
+
 func TestMarkdownPreviewForBrowserDisablesRawHTML(t *testing.T) {
 	rootDir := t.TempDir()
 	filePath := filepath.Join(rootDir, "README.md")
@@ -330,6 +372,7 @@ func TestNewHandlerRequiresMarkdownTemplate(t *testing.T) {
 		"assets/media.html":     {Data: []byte("media")},
 		"assets/json.html":      {Data: []byte("json")},
 		"assets/pdf.html":       {Data: []byte("pdf")},
+		"assets/zip.html":       {Data: []byte("zip")},
 	}
 
 	_, err := NewHandler(Config{
