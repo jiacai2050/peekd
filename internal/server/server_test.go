@@ -20,6 +20,8 @@ var testEmbeddedFiles = fstest.MapFS{
 	"assets/directory.html": {Data: []byte("<!doctype html><body><a href=\"/\">Peekd</a>{{if .HasParent}}<a href=\"../\">Parent directory</a>{{end}}{{range .Entries}}<div class=\"entry\">{{.Name}}|{{.URL}}|{{.FileModeBits}}|{{.Modified}}</div>{{end}}</body>")},
 	"assets/image.html":     {Data: []byte("<!doctype html><body>image {{.FileName}}</body>")},
 	"assets/media.html":     {Data: []byte("<!doctype html><body>media {{.FileName}}</body>")},
+	"assets/json.html":      {Data: []byte("<!doctype html><body>json {{.FileName}}<pre>{{.Content}}</pre></body>")},
+	"assets/pdf.html":       {Data: []byte("<!doctype html><body>pdf {{.FileName}} {{.RawURL}}</body>")},
 	"assets/markdown.html":  {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
 	"assets/preview.css":    {Data: []byte("body{}")},
 	"assets/directory.css":  {Data: []byte("body{}")},
@@ -161,6 +163,49 @@ func TestContentDetectedImageFileIsPreviewed(t *testing.T) {
 	}
 }
 
+func TestPDFFileIsPreviewed(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "manual.pdf")
+	if err := os.WriteFile(filePath, []byte("%PDF-1.7\n"), 0o600); err != nil {
+		t.Fatalf("write PDF file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/manual.pdf", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	if !strings.Contains(response.Body.String(), "pdf manual.pdf /manual.pdf?raw=1") {
+		t.Fatalf("expected PDF preview, got %q", response.Body.String())
+	}
+}
+
+func TestJSONFileIsFormatted(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "config.json")
+	if err := os.WriteFile(filePath, []byte(`{"name":"peekd","enabled":true}`), 0o600); err != nil {
+		t.Fatalf("write JSON file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/config.json", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	body := response.Body.String()
+	if !strings.Contains(body, "&#34;name&#34;: &#34;peekd&#34;") || !strings.Contains(body, "&#34;enabled&#34;: true") {
+		t.Fatalf("expected formatted JSON preview, got %q", body)
+	}
+}
+
 func TestMarkdownPreviewForBrowserDisablesRawHTML(t *testing.T) {
 	rootDir := t.TempDir()
 	filePath := filepath.Join(rootDir, "README.md")
@@ -283,6 +328,8 @@ func TestNewHandlerRequiresMarkdownTemplate(t *testing.T) {
 		"assets/directory.html": {Data: []byte("directory")},
 		"assets/image.html":     {Data: []byte("image")},
 		"assets/media.html":     {Data: []byte("media")},
+		"assets/json.html":      {Data: []byte("json")},
+		"assets/pdf.html":       {Data: []byte("pdf")},
 	}
 
 	_, err := NewHandler(Config{

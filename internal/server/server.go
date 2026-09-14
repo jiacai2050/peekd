@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -127,6 +128,16 @@ type textPreviewData struct {
 	Version    string
 }
 
+type jsonPreviewData struct {
+	FileName   string
+	Content    string
+	RawURL     string
+	Size       string
+	Modified   string
+	ProjectURL string
+	Version    string
+}
+
 type markdownPreviewData struct {
 	FileName   string
 	HTML       template.HTML
@@ -147,6 +158,15 @@ type mediaPreviewData struct {
 	Version    string
 }
 
+type pdfPreviewData struct {
+	FileName   string
+	RawURL     string
+	Size       string
+	Modified   string
+	ProjectURL string
+	Version    string
+}
+
 type previewType string
 
 const (
@@ -156,6 +176,8 @@ const (
 	previewTypeImage    previewType = "image"
 	previewTypeAudio    previewType = "audio"
 	previewTypeVideo    previewType = "video"
+	previewTypePDF      previewType = "pdf"
+	previewTypeJSON     previewType = "json"
 )
 
 var markdownRenderer = goldmark.New(
@@ -190,8 +212,12 @@ func previewTypeByExtension(filePath string) previewType {
 		return previewTypeAudio
 	case ".avi", ".m4v", ".mkv", ".mov", ".mp4", ".ogv", ".webm":
 		return previewTypeVideo
+	case ".pdf":
+		return previewTypePDF
+	case ".json":
+		return previewTypeJSON
 	case ".txt", ".log", ".conf", ".ini", ".properties",
-		".json", ".jsonc", ".yaml", ".yml", ".toml", ".xml",
+		".jsonc", ".yaml", ".yml", ".toml", ".xml",
 		".rst",
 		".html", ".htm", ".css", ".scss", ".sass", ".less",
 		".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
@@ -221,6 +247,10 @@ func previewTypeByContent(contentType string) previewType {
 		return previewTypeAudio
 	case strings.HasPrefix(contentType, "video/"):
 		return previewTypeVideo
+	case contentType == "application/pdf":
+		return previewTypePDF
+	case contentType == "application/json":
+		return previewTypeJSON
 	case strings.HasPrefix(contentType, "text/"):
 		return previewTypeText
 	default:
@@ -330,12 +360,32 @@ func readTextPreview(filePath string, maxSize int64) ([]byte, bool, error) {
 	return content, true, nil
 }
 
+func readPreviewContent(filePath string, fileSize, maxSize int64) ([]byte, bool, error) {
+	if fileSize > maxSize {
+		return nil, false, nil
+	}
+
+	content, previewable, err := readTextPreview(filePath, maxSize)
+	if err != nil || !previewable || !utf8.Valid(content) {
+		return content, false, err
+	}
+	return content, true, nil
+}
+
 func renderMarkdown(content []byte) (template.HTML, error) {
 	var output bytes.Buffer
 	if err := markdownRenderer.Convert(content, &output); err != nil {
 		return "", err
 	}
 	return template.HTML(output.String()), nil
+}
+
+func formatJSON(content []byte) (string, error) {
+	var output bytes.Buffer
+	if err := json.Indent(&output, content, "", "  "); err != nil {
+		return "", err
+	}
+	return output.String(), nil
 }
 
 func directoryEntryURL(requestPath, name string, isDir bool) string {
@@ -484,6 +534,14 @@ func NewHandler(config Config) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse media template: %w", err)
 	}
+	jsonTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/json.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JSON template: %w", err)
+	}
+	pdfTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/pdf.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse PDF template: %w", err)
+	}
 	markdownTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/markdown.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse markdown template: %w", err)
@@ -531,6 +589,28 @@ func NewHandler(config Config) (http.Handler, error) {
 			preview = previewTypeByContent(contentType)
 		}
 
+		var content []byte
+		var formattedJSON string
+		if preview == previewTypeJSON || preview == previewTypeText || preview == previewTypeMarkdown {
+			var previewable bool
+			content, previewable, err = readPreviewContent(fullPath, info.Size(), config.MaxTextPreviewSize)
+			if err != nil {
+				http.Error(w, "unable to read file", http.StatusInternalServerError)
+				return
+			}
+			if !previewable {
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+
+			if preview == previewTypeJSON {
+				formattedJSON, err = formatJSON(content)
+				if err != nil {
+					preview = previewTypeText
+				}
+			}
+		}
+
 		switch preview {
 		case previewTypeImage:
 			data := mediaPreviewData{
@@ -565,46 +645,63 @@ func NewHandler(config Config) (http.Handler, error) {
 			}
 			return
 
-		case previewTypeText, previewTypeMarkdown:
-			if info.Size() > config.MaxTextPreviewSize {
-				fileServer.ServeHTTP(w, r)
-				return
+		case previewTypePDF:
+			data := pdfPreviewData{
+				FileName:   filepath.Base(fullPath),
+				RawURL:     (&url.URL{Path: r.URL.Path, RawQuery: "raw=1"}).String(),
+				Size:       formatFileSize(info.Size()),
+				Modified:   info.ModTime().Format("2006-01-02 15:04:05"),
+				ProjectURL: config.ProjectURL,
+				Version:    config.Version,
 			}
 
-			content, previewable, err := readTextPreview(fullPath, config.MaxTextPreviewSize)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := pdfTemplate.Execute(w, data); err != nil {
+				log.Printf("failed to render PDF preview %s: %v", r.URL.Path, err)
+			}
+			return
+
+		case previewTypeJSON:
+			data := jsonPreviewData{
+				FileName:   filepath.Base(fullPath),
+				Content:    formattedJSON,
+				RawURL:     (&url.URL{Path: r.URL.Path, RawQuery: "raw=1"}).String(),
+				Size:       formatFileSize(info.Size()),
+				Modified:   info.ModTime().Format("2006-01-02 15:04:05"),
+				ProjectURL: config.ProjectURL,
+				Version:    config.Version,
+			}
+
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := jsonTemplate.Execute(w, data); err != nil {
+				log.Printf("failed to render JSON preview %s: %v", r.URL.Path, err)
+			}
+			return
+
+		case previewTypeMarkdown:
+			markdownHTML, err := renderMarkdown(content)
 			if err != nil {
-				http.Error(w, "unable to read file", http.StatusInternalServerError)
-				return
-			}
-			if !previewable || !utf8.Valid(content) {
-				fileServer.ServeHTTP(w, r)
+				http.Error(w, "unable to render markdown", http.StatusInternalServerError)
 				return
 			}
 
-			if preview == previewTypeMarkdown {
-				markdownHTML, err := renderMarkdown(content)
-				if err != nil {
-					http.Error(w, "unable to render markdown", http.StatusInternalServerError)
-					return
-				}
-
-				data := markdownPreviewData{
-					FileName:   filepath.Base(fullPath),
-					HTML:       markdownHTML,
-					RawURL:     (&url.URL{Path: r.URL.Path, RawQuery: "raw=1"}).String(),
-					Size:       formatFileSize(info.Size()),
-					Modified:   info.ModTime().Format("2006-01-02 15:04:05"),
-					ProjectURL: config.ProjectURL,
-					Version:    config.Version,
-				}
-
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				if err := markdownTemplate.Execute(w, data); err != nil {
-					log.Printf("failed to render markdown preview %s: %v", r.URL.Path, err)
-				}
-				return
+			data := markdownPreviewData{
+				FileName:   filepath.Base(fullPath),
+				HTML:       markdownHTML,
+				RawURL:     (&url.URL{Path: r.URL.Path, RawQuery: "raw=1"}).String(),
+				Size:       formatFileSize(info.Size()),
+				Modified:   info.ModTime().Format("2006-01-02 15:04:05"),
+				ProjectURL: config.ProjectURL,
+				Version:    config.Version,
 			}
 
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := markdownTemplate.Execute(w, data); err != nil {
+				log.Printf("failed to render markdown preview %s: %v", r.URL.Path, err)
+			}
+			return
+
+		case previewTypeText:
 			data := textPreviewData{
 				FileName:   filepath.Base(fullPath),
 				Lines:      splitLines(string(content)),
