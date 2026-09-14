@@ -3,14 +3,14 @@ ROOT ?= .
 ADDR ?= :8090
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
+run:
+	go run . -root "$(ROOT)" -addr "$(ADDR)"
+
 build:
 	go build -ldflags "-X main.Version=$(VERSION)" -o $(APP) .
 
 test:
 	go test -v ./...
-
-run:
-	go run . -root "$(ROOT)" -addr "$(ADDR)"
 
 fmt:
 	gofmt -w $$(git ls-files '*.go')

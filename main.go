@@ -46,7 +46,6 @@ type directoryEntry struct {
 
 type directoryData struct {
 	Path       string
-	ParentURL  string
 	HasParent  bool
 	Entries    []directoryEntry
 	ProjectURL string
@@ -225,17 +224,6 @@ func directoryEntryURL(requestPath, name string, isDir bool) string {
 	return (&url.URL{Path: entryPath}).String()
 }
 
-func directoryParentURL(requestPath string) string {
-	parentPath := path.Dir(strings.TrimSuffix(requestPath, "/"))
-	if parentPath == "." {
-		parentPath = "/"
-	}
-	if !strings.HasSuffix(parentPath, "/") {
-		parentPath += "/"
-	}
-	return (&url.URL{Path: parentPath}).String()
-}
-
 func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPath string, tmpl *template.Template) {
 	fullPath := filepath.Join(rootDir, filepath.FromSlash(requestPath))
 	entries, err := os.ReadDir(fullPath)
@@ -254,9 +242,6 @@ func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPat
 		HasParent:  requestPath != "/",
 		ProjectURL: ProjectURL,
 		Version:    Version,
-	}
-	if data.HasParent {
-		data.ParentURL = directoryParentURL(requestPath)
 	}
 
 	for _, entry := range entries {

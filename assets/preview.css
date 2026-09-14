@@ -58,6 +58,11 @@ body {
     background: #374151;
 }
 
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
 pre {
     margin: 0;
     padding: 24px;

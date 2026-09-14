@@ -32,11 +32,20 @@ body {
     text-transform: uppercase;
 }
 
-h1 {
+.eyebrow a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.eyebrow a:hover {
+    text-decoration: underline;
+}
+
+.current-path {
     margin: 0;
     overflow-wrap: anywhere;
-    font-size: clamp(24px, 4vw, 36px);
-    letter-spacing: -0.03em;
+    font-size: 18px;
+    font-weight: 600;
 }
 
 .entry-count {

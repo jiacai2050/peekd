@@ -16,7 +16,10 @@
                     <span>Modified {{.Modified}}</span>
                 </div>
             </div>
-            <a class="download-button" href="{{.RawURL}}" download>Download original</a>
+            <div class="header-actions">
+                <a class="download-button" href="./">Back to directory</a>
+                <a class="download-button" href="{{.RawURL}}" download>Download original</a>
+            </div>
         </div>
         <div class="image-frame">
             <img src="{{.RawURL}}" alt="{{.FileName}}">
