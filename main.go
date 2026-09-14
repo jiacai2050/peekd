@@ -2,12 +2,14 @@ package main
 
 import (
 	"embed"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log"
-	"mime"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,12 +18,14 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"sort"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unicode/utf8"
 )
 
-// 1. 🌟 Core magic: use go:embed to bundle all files in the assets directory into the binary.
+// 1. Core magic: use go:embed to bundle all files in the assets directory into the binary.
 //
 //go:embed assets/*
 var embeddedFiles embed.FS
@@ -154,6 +158,65 @@ func splitLines(content string) []string {
 	return lines
 }
 
+func isBrowserUserAgent(userAgent string) bool {
+	return strings.Contains(strings.ToLower(userAgent), "mozilla")
+}
+
+func parseByteSize(value string) (int64, error) {
+	value = strings.TrimSpace(value)
+	numberEnd := 0
+	for numberEnd < len(value) && (value[numberEnd] == '.' || value[numberEnd] >= '0' && value[numberEnd] <= '9') {
+		numberEnd++
+	}
+	if numberEnd == 0 {
+		return 0, fmt.Errorf("invalid size %q", value)
+	}
+
+	number, err := strconv.ParseFloat(value[:numberEnd], 64)
+	if err != nil || math.IsNaN(number) || math.IsInf(number, 0) {
+		return 0, fmt.Errorf("invalid size %q", value)
+	}
+
+	multiplier := int64(1)
+	switch strings.ToUpper(strings.TrimSpace(value[numberEnd:])) {
+	case "":
+	case "B":
+	case "K", "KB", "KIB":
+		multiplier = 1 << 10
+	case "M", "MB", "MIB":
+		multiplier = 1 << 20
+	case "G", "GB", "GIB":
+		multiplier = 1 << 30
+	case "T", "TB", "TIB":
+		multiplier = 1 << 40
+	default:
+		return 0, fmt.Errorf("invalid size suffix in %q", value)
+	}
+
+	size := number * float64(multiplier)
+	if size <= 0 || size >= float64(1<<63) || math.Trunc(size) != size {
+		return 0, fmt.Errorf("size out of range %q", value)
+	}
+	return int64(size), nil
+}
+
+func readTextPreview(filePath string, maxSize int64) ([]byte, bool, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, false, err
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(io.LimitReader(file, maxSize+1))
+	if err != nil {
+		return nil, false, err
+	}
+	if int64(len(content)) > maxSize {
+		return nil, false, nil
+	}
+	return content, true, nil
+}
+
 func directoryEntryURL(requestPath, name string, isDir bool) string {
 	entryPath := path.Join(requestPath, name)
 	if isDir {
@@ -212,7 +275,7 @@ func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPat
 			URL:      directoryEntryURL(requestPath, entry.Name(), entry.IsDir()),
 			Icon:     fileIcon(entry.Name(), entry.IsDir()),
 			Size:     size,
-			Modified: info.ModTime().Format("2006-01-02 15:04"),
+			Modified: info.ModTime().Format("2006-01-02 15:04:05"),
 			IsDir:    entry.IsDir(),
 			ModTime:  info.ModTime(),
 		})
@@ -273,9 +336,41 @@ func printServerAddresses(addr net.Addr) {
 	}
 }
 
+func listenWithFallback(addr string) (net.Listener, error) {
+	currentAddr := addr
+	for {
+		listener, err := net.Listen("tcp", currentAddr)
+		if err == nil {
+			return listener, nil
+		}
+		if !errors.Is(err, syscall.EADDRINUSE) {
+			return nil, err
+		}
+
+		host, port, splitErr := net.SplitHostPort(currentAddr)
+		if splitErr != nil {
+			return nil, err
+		}
+		portNumber, parseErr := strconv.Atoi(port)
+		if parseErr != nil || portNumber >= 65535 {
+			return nil, err
+		}
+		currentAddr = net.JoinHostPort(host, strconv.Itoa(portNumber+1))
+	}
+}
+
 func main() {
 	rootDir := flag.String("root", ".", "directory to serve")
 	addr := flag.String("addr", ":8090", "HTTP server address")
+	maxTextPreviewSize := int64(4 << 20)
+	flag.Func("max-preview-size", "maximum text preview size (default 4M; e.g. 512K or 4194304)", func(value string) error {
+		parsed, err := parseByteSize(value)
+		if err != nil {
+			return err
+		}
+		maxTextPreviewSize = parsed
+		return nil
+	})
 	showVersion := flag.Bool("version", false, "print version")
 	flag.Parse()
 
@@ -300,7 +395,7 @@ func main() {
 		log.Fatalf("failed to resolve root directory: %v", err)
 	}
 
-	// 2. 🌟 Read and parse the HTML template from the embedded file system.
+	// 2. Read and parse the HTML template from the embedded file system.
 	tmpl, err := template.ParseFS(embeddedFiles, "assets/text.html")
 	if err != nil {
 		log.Fatalf("failed to parse embedded template: %v", err)
@@ -318,7 +413,7 @@ func main() {
 		log.Fatalf("failed to parse media template: %v", err)
 	}
 
-	// 3. 🌟 Extract the "assets" subdirectory from the embedded file system
+	// 3. Extract the "assets" subdirectory from the embedded file system
 	// so it can be served as HTTP static resources.
 	assetsFS, err := fs.Sub(embeddedFiles, "assets")
 	if err != nil {
@@ -328,9 +423,9 @@ func main() {
 	// Serve files from the physical disk for large downloads, with sendfile support.
 	fileServer := http.FileServer(http.Dir(*rootDir))
 
-	// 4. 🌟 Provide a dedicated route for frontend CSS resources.
-	// The /_zero_serve_assets/ route maps directly to the assetsFS bundled inside the binary.
-	http.Handle("/_zero_serve_assets/", http.StripPrefix("/_zero_serve_assets/", http.FileServer(http.FS(assetsFS))))
+	// 4. Provide a dedicated route for frontend CSS resources.
+	// The /__peekd_assets/ route maps directly to the assetsFS bundled inside the binary.
+	http.Handle("/__peekd_assets/", http.StripPrefix("/__peekd_assets/", http.FileServer(http.FS(assetsFS))))
 
 	// Main route for browsing files.
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -347,7 +442,8 @@ func main() {
 			return
 		}
 
-		if r.URL.Query().Get("raw") == "1" && !info.IsDir() {
+		browserUserAgent := isBrowserUserAgent(r.UserAgent())
+		if !info.IsDir() && (r.URL.Query().Get("raw") == "1" || !browserUserAgent) {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
@@ -357,7 +453,7 @@ func main() {
 				FileName:   filepath.Base(fullPath),
 				RawURL:     (&url.URL{Path: r.URL.Path, RawQuery: "raw=1"}).String(),
 				Size:       formatFileSize(info.Size()),
-				Modified:   info.ModTime().Format("2006-01-02 15:04"),
+				Modified:   info.ModTime().Format("2006-01-02 15:04:05"),
 				ProjectURL: ProjectURL,
 				Version:    Version,
 			}
@@ -376,7 +472,7 @@ func main() {
 					RawURL:     (&url.URL{Path: r.URL.Path, RawQuery: "raw=1"}).String(),
 					MediaKind:  kind,
 					Size:       formatFileSize(info.Size()),
-					Modified:   info.ModTime().Format("2006-01-02 15:04"),
+					Modified:   info.ModTime().Format("2006-01-02 15:04:05"),
 					ProjectURL: ProjectURL,
 					Version:    Version,
 				}
@@ -391,15 +487,17 @@ func main() {
 
 		// Read and render text files using the template.
 		if !info.IsDir() && isTextFile(fullPath) {
-			content, err := os.ReadFile(fullPath)
+			if info.Size() > maxTextPreviewSize {
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+
+			content, previewable, err := readTextPreview(fullPath, maxTextPreviewSize)
 			if err != nil {
 				http.Error(w, "unable to read file", http.StatusInternalServerError)
 				return
 			}
-			if !utf8.Valid(content) {
-				w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{
-					"filename": filepath.Base(fullPath),
-				}))
+			if !previewable || !utf8.Valid(content) {
 				fileServer.ServeHTTP(w, r)
 				return
 			}
@@ -409,7 +507,7 @@ func main() {
 				Lines:      splitLines(string(content)),
 				RawURL:     (&url.URL{Path: r.URL.Path, RawQuery: "raw=1"}).String(),
 				Size:       formatFileSize(info.Size()),
-				Modified:   info.ModTime().Format("2006-01-02 15:04"),
+				Modified:   info.ModTime().Format("2006-01-02 15:04:05"),
 				ProjectURL: ProjectURL,
 				Version:    Version,
 			}
@@ -428,7 +526,7 @@ func main() {
 		fileServer.ServeHTTP(w, r)
 	})
 
-	listener, err := net.Listen("tcp", *addr)
+	listener, err := listenWithFallback(*addr)
 	if err != nil {
 		log.Fatalf("failed to listen on %s: %v", *addr, err)
 	}

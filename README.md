@@ -6,8 +6,6 @@ previews for text, code, images, audio, and video, resumable downloads through
 HTTP byte ranges, and direct file delivery that can use Go's `sendfile`
 optimization with minimal user-space copying.
 
-![](./demo.webp)
-
 | Directory | Text Preview |
 | :---: | :---: |
 | ![](screenshots/directory.webp) | ![](screenshots/preview-text.web) |
@@ -57,6 +55,9 @@ and choose a custom listening address with `-addr`:
 ./peekd -root ~/Downloads -addr :9000
 ```
 
+If the requested port is already in use, Peekd automatically tries the next
+port.
+
 Print the version and build information:
 
 ```bash
@@ -72,7 +73,10 @@ go run . -root ~/Downloads
 At startup, Peekd prints the local URLs that can be opened in a browser.
 Directories have a custom listing sorted by modification time. Text files,
 images, audio, and video have dedicated previews; other files are served
-directly.
+directly. Text previews are limited to 4 MiB; larger text files are served
+directly instead. Use `-max-preview-size` to change the limit. It accepts
+values such as `4M`, `512K`, or `4194304`. Requests from non-browser user
+agents receive the original file instead of opening previews.
 
 ### Resumable downloads
 
