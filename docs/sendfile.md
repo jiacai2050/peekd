@@ -38,11 +38,11 @@ curl -o large-file.iso \
 
 ## Verify on Linux
 
-Build the server and use `strace` to trace only `sendfile`:
+Build the server and trace both normal writes and `sendfile`:
 
 ```bash
 go build -o peekd .
-strace -f -e trace=sendfile ./peekd -root /path/to/files
+strace -ttt -f -e trace=write,writev,sendfile ./peekd -root /path/to/files
 ```
 
 From another terminal, request a regular binary file:
@@ -54,8 +54,16 @@ curl -o /dev/null http://127.0.0.1:8090/large-file.bin
 If Go uses the optimization, you should see output similar to:
 
 ```text
-sendfile(8, 7, NULL, 4194304) = 4194304
+write(5, "HTTP/1.1 200 OK\r\n...", 702) = 702
+sendfile(5, 8, NULL, 1165) = 1165
 ```
+
+The first `write` includes the HTTP response headers and usually the first
+512 bytes of the file, which Go reads before switching to `sendfile`. The
+`sendfile` count is therefore only the remaining part of the response body.
+For example, `512 + 1165 = 1677` is the complete file body, while the `702`
+bytes reported by `write` also include the response headers. Peekd's access
+log counts only response-body bytes.
 
 Use a regular non-text file for this test. If no `sendfile` call appears, check
 that the file is served directly, the response is not being transformed, and

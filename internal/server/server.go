@@ -99,13 +99,14 @@ func withAccessLog(handler http.Handler) http.Handler {
 }
 
 type directoryEntry struct {
-	Name     string
-	URL      string
-	Icon     string
-	Size     string
-	Modified string
-	IsDir    bool
-	ModTime  time.Time
+	Name         string
+	URL          string
+	Icon         string
+	FileModeBits string
+	Size         string
+	Modified     string
+	IsDir        bool
+	ModTime      time.Time
 }
 
 type directoryData struct {
@@ -139,23 +140,59 @@ type markdownPreviewData struct {
 type mediaPreviewData struct {
 	FileName   string
 	RawURL     string
-	MediaKind  string
+	MediaKind  previewType
 	Size       string
 	Modified   string
 	ProjectURL string
 	Version    string
 }
 
+type previewType string
+
+const (
+	previewTypeNone     previewType = ""
+	previewTypeText     previewType = "text"
+	previewTypeMarkdown previewType = "markdown"
+	previewTypeImage    previewType = "image"
+	previewTypeAudio    previewType = "audio"
+	previewTypeVideo    previewType = "video"
+)
+
 var markdownRenderer = goldmark.New(
 	goldmark.WithExtensions(extension.GFM),
 )
 
-func isTextFile(path string) bool {
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
+func detectContentType(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", err
+	}
+	if n == 0 {
+		return "", nil
+	}
+	return http.DetectContentType(buffer[:n]), nil
+}
+
+func previewTypeByExtension(filePath string) previewType {
+	switch strings.ToLower(filepath.Ext(filePath)) {
+	case ".md", ".markdown":
+		return previewTypeMarkdown
+	case ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg", ".tif", ".tiff", ".webp":
+		return previewTypeImage
+	case ".aac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".opus", ".wav", ".weba":
+		return previewTypeAudio
+	case ".avi", ".m4v", ".mkv", ".mov", ".mp4", ".ogv", ".webm":
+		return previewTypeVideo
 	case ".txt", ".log", ".conf", ".ini", ".properties",
 		".json", ".jsonc", ".yaml", ".yml", ".toml", ".xml",
-		".md", ".markdown", ".rst",
+		".rst",
 		".html", ".htm", ".css", ".scss", ".sass", ".less",
 		".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
 		".vue", ".svelte",
@@ -165,43 +202,29 @@ func isTextFile(path string) bool {
 		".cs", ".fs", ".fsx",
 		".sh", ".bash", ".zsh", ".fish", ".ps1",
 		".sql":
-		return true
-	}
-
-	switch strings.ToLower(filepath.Base(path)) {
-	case "makefile", "dockerfile", "jenkinsfile", "justfile", "license":
-		return true
+		return previewTypeText
 	default:
-		return false
-	}
-}
-
-func isMarkdownFile(path string) bool {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".md", ".markdown":
-		return true
-	default:
-		return false
+		switch strings.ToLower(filepath.Base(filePath)) {
+		case "makefile", "dockerfile", "jenkinsfile", "justfile", "license":
+			return previewTypeText
+		default:
+			return previewTypeNone
+		}
 	}
 }
 
-func isImageFile(path string) bool {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg", ".tif", ".tiff", ".webp":
-		return true
+func previewTypeByContent(contentType string) previewType {
+	switch {
+	case strings.HasPrefix(contentType, "image/"):
+		return previewTypeImage
+	case strings.HasPrefix(contentType, "audio/"):
+		return previewTypeAudio
+	case strings.HasPrefix(contentType, "video/"):
+		return previewTypeVideo
+	case strings.HasPrefix(contentType, "text/"):
+		return previewTypeText
 	default:
-		return false
-	}
-}
-
-func mediaKind(path string) string {
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".aac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".opus", ".wav", ".weba":
-		return "audio"
-	case ".avi", ".m4v", ".mkv", ".mov", ".mp4", ".ogv", ".webm":
-		return "video"
-	default:
-		return ""
+		return previewTypeNone
 	}
 }
 
@@ -209,16 +232,15 @@ func fileIcon(path string, isDir bool) string {
 	if isDir {
 		return "📁"
 	}
-	if isImageFile(path) {
+
+	switch previewTypeByExtension(path) {
+	case previewTypeImage:
 		return "🖼️"
-	}
-	if mediaKind(path) == "audio" {
+	case previewTypeAudio:
 		return "🎵"
-	}
-	if mediaKind(path) == "video" {
+	case previewTypeVideo:
 		return "🎬"
-	}
-	if isTextFile(path) {
+	case previewTypeText, previewTypeMarkdown:
 		return "📄"
 	}
 
@@ -360,13 +382,14 @@ func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPat
 			size = formatFileSize(info.Size())
 		}
 		data.Entries = append(data.Entries, directoryEntry{
-			Name:     entry.Name(),
-			URL:      directoryEntryURL(requestPath, entry.Name(), entry.IsDir()),
-			Icon:     fileIcon(entry.Name(), entry.IsDir()),
-			Size:     size,
-			Modified: info.ModTime().Format("2006-01-02 15:04:05"),
-			IsDir:    entry.IsDir(),
-			ModTime:  info.ModTime(),
+			Name:         entry.Name(),
+			URL:          directoryEntryURL(requestPath, entry.Name(), entry.IsDir()),
+			Icon:         fileIcon(entry.Name(), entry.IsDir()),
+			FileModeBits: info.Mode().String(),
+			Size:         size,
+			Modified:     info.ModTime().Format("2006-01-02 15:04:05"),
+			IsDir:        entry.IsDir(),
+			ModTime:      info.ModTime(),
 		})
 	}
 
@@ -498,7 +521,21 @@ func NewHandler(config Config) (http.Handler, error) {
 			return
 		}
 
-		if !info.IsDir() && isImageFile(fullPath) {
+		preview := previewTypeNone
+		if !info.IsDir() {
+			preview = previewTypeByExtension(fullPath)
+			if preview == previewTypeNone {
+				contentType, detectErr := detectContentType(fullPath)
+				if detectErr != nil {
+					http.Error(w, "unable to inspect file", http.StatusInternalServerError)
+					return
+				}
+				preview = previewTypeByContent(contentType)
+			}
+		}
+
+		switch preview {
+		case previewTypeImage:
 			data := mediaPreviewData{
 				FileName:   filepath.Base(fullPath),
 				RawURL:     (&url.URL{Path: r.URL.Path, RawQuery: "raw=1"}).String(),
@@ -513,29 +550,25 @@ func NewHandler(config Config) (http.Handler, error) {
 				log.Printf("failed to render image preview %s: %v", r.URL.Path, err)
 			}
 			return
-		}
 
-		if !info.IsDir() {
-			if kind := mediaKind(fullPath); kind != "" {
-				data := mediaPreviewData{
-					FileName:   filepath.Base(fullPath),
-					RawURL:     (&url.URL{Path: r.URL.Path, RawQuery: "raw=1"}).String(),
-					MediaKind:  kind,
-					Size:       formatFileSize(info.Size()),
-					Modified:   info.ModTime().Format("2006-01-02 15:04:05"),
-					ProjectURL: config.ProjectURL,
-					Version:    config.Version,
-				}
-
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				if err := mediaTemplate.Execute(w, data); err != nil {
-					log.Printf("failed to render media preview %s: %v", r.URL.Path, err)
-				}
-				return
+		case previewTypeAudio, previewTypeVideo:
+			data := mediaPreviewData{
+				FileName:   filepath.Base(fullPath),
+				RawURL:     (&url.URL{Path: r.URL.Path, RawQuery: "raw=1"}).String(),
+				MediaKind:  preview,
+				Size:       formatFileSize(info.Size()),
+				Modified:   info.ModTime().Format("2006-01-02 15:04:05"),
+				ProjectURL: config.ProjectURL,
+				Version:    config.Version,
 			}
-		}
 
-		if !info.IsDir() && isTextFile(fullPath) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := mediaTemplate.Execute(w, data); err != nil {
+				log.Printf("failed to render media preview %s: %v", r.URL.Path, err)
+			}
+			return
+
+		case previewTypeText, previewTypeMarkdown:
 			if info.Size() > config.MaxTextPreviewSize {
 				fileServer.ServeHTTP(w, r)
 				return
@@ -551,7 +584,7 @@ func NewHandler(config Config) (http.Handler, error) {
 				return
 			}
 
-			if isMarkdownFile(fullPath) {
+			if preview == previewTypeMarkdown {
 				markdownHTML, err := renderMarkdown(content)
 				if err != nil {
 					http.Error(w, "unable to render markdown", http.StatusInternalServerError)

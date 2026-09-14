@@ -17,7 +17,7 @@ import (
 
 var testEmbeddedFiles = fstest.MapFS{
 	"assets/text.html":      {Data: []byte("<!doctype html><body>{{range .Lines}}{{.}}\n{{end}}</body>")},
-	"assets/directory.html": {Data: []byte("<!doctype html><body><a href=\"/\">Peekd</a>{{if .HasParent}}<a href=\"../\">Parent directory</a>{{end}}{{range .Entries}}<div class=\"entry\">{{.Name}}|{{.Modified}}</div>{{end}}</body>")},
+	"assets/directory.html": {Data: []byte("<!doctype html><body><a href=\"/\">Peekd</a>{{if .HasParent}}<a href=\"../\">Parent directory</a>{{end}}{{range .Entries}}<div class=\"entry\">{{.Name}}|{{.FileModeBits}}|{{.Modified}}</div>{{end}}</body>")},
 	"assets/image.html":     {Data: []byte("<!doctype html><body>image {{.FileName}}</body>")},
 	"assets/media.html":     {Data: []byte("<!doctype html><body>media {{.FileName}}</body>")},
 	"assets/markdown.html":  {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
@@ -140,6 +140,49 @@ func TestReadTextPreviewEnforcesLimit(t *testing.T) {
 	}
 }
 
+func TestContentDetectedTextFileIsPreviewed(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "notes")
+	if err := os.WriteFile(filePath, []byte("content without an extension"), 0o600); err != nil {
+		t.Fatalf("write text file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/notes", nil)
+	request.Header.Set("User-Agent", "Mozilla/5.0")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	if !strings.Contains(response.Body.String(), "content without an extension") {
+		t.Fatalf("expected extensionless text file preview, got %q", response.Body.String())
+	}
+}
+
+func TestContentDetectedImageFileIsPreviewed(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "image")
+	pngSignature := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}
+	if err := os.WriteFile(filePath, pngSignature, 0o600); err != nil {
+		t.Fatalf("write image file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/image", nil)
+	request.Header.Set("User-Agent", "Mozilla/5.0")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	if !strings.Contains(response.Body.String(), "image image") {
+		t.Fatalf("expected extensionless image preview, got %q", response.Body.String())
+	}
+}
+
 func TestMarkdownPreviewForBrowserDisablesRawHTML(t *testing.T) {
 	rootDir := t.TempDir()
 	filePath := filepath.Join(rootDir, "README.md")
@@ -224,6 +267,9 @@ func TestDirectoryPreviewContainsParentAndRootLinksAndSecondPrecision(t *testing
 	}
 	if !strings.Contains(body, "href=\"/\"") {
 		t.Fatalf("expected root link in directory preview, got %q", body)
+	}
+	if !strings.Contains(body, "-rw-------") {
+		t.Fatalf("expected file mode bits in directory preview, got %q", body)
 	}
 
 	re := regexp.MustCompile(`\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)

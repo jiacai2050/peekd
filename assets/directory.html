@@ -21,6 +21,7 @@
             <a class="file-row directory-row" href="../">
                 <span class="file-icon">↩</span>
                 <span class="file-name">Parent directory</span>
+                <span class="file-mode">—</span>
                 <span class="file-meta">—</span>
                 <span class="file-date">—</span>
             </a>
@@ -29,6 +30,7 @@
             <a class="file-row{{if .IsDir}} directory-row{{end}}" href="{{.URL}}">
                 <span class="file-icon">{{.Icon}}</span>
                 <span class="file-name">{{.Name}}{{if .IsDir}}/{{end}}</span>
+                <span class="file-mode">{{.FileModeBits}}</span>
                 <span class="file-meta">{{.Size}}</span>
                 <span class="file-date">{{.Modified}}</span>
             </a>
