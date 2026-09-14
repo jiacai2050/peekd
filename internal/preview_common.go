@@ -18,6 +18,8 @@ const (
 	previewTypePDF      previewType = "pdf"
 	previewTypeJSON     previewType = "json"
 	previewTypeZIP      previewType = "zip"
+	previewTypeTAR      previewType = "tar"
+	previewTypeTARGZ    previewType = "tar-gz"
 )
 
 func previewRawURL(requestPath string) string {

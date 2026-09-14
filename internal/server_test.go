@@ -1,7 +1,9 @@
 package internal
 
 import (
+	"archive/tar"
 	"archive/zip"
+	"compress/gzip"
 	"io/fs"
 	"net"
 	"net/http"
@@ -23,7 +25,7 @@ var testEmbeddedFiles = fstest.MapFS{
 	"assets/media.html":     {Data: []byte("<!doctype html><body>media {{.FileName}}</body>")},
 	"assets/json.html":      {Data: []byte("<!doctype html><body>json {{.FileName}}<pre>{{.Content}}</pre></body>")},
 	"assets/pdf.html":       {Data: []byte("<!doctype html><body>pdf {{.FileName}} {{.RawURL}}</body>")},
-	"assets/zip.html":       {Data: []byte("<!doctype html><body>zip {{.FileName}} {{range .Entries}}{{.Name}}|{{.Size}}{{end}}</body>")},
+	"assets/archive.html":   {Data: []byte("<!doctype html><body>archive {{.FileName}} {{range .Entries}}{{.Name}}|{{.Size}}{{end}}</body>")},
 	"assets/markdown.html":  {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
 	"assets/preview.css":    {Data: []byte("body{}")},
 	"assets/directory.css":  {Data: []byte("body{}")},
@@ -248,6 +250,80 @@ func TestZIPFileListsEntries(t *testing.T) {
 	}
 }
 
+func TestTARFileListsEntries(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "bundle.tar")
+	file, err := os.Create(filePath)
+	if err != nil {
+		t.Fatalf("create TAR file: %v", err)
+	}
+	writer := tar.NewWriter(file)
+	if err := writer.WriteHeader(&tar.Header{Name: "docs/readme.txt", Size: 5, Mode: 0o600}); err != nil {
+		t.Fatalf("create TAR entry: %v", err)
+	}
+	if _, err := writer.Write([]byte("hello")); err != nil {
+		t.Fatalf("write TAR entry: %v", err)
+	}
+	if err := writer.WriteHeader(&tar.Header{Name: "images/", Typeflag: tar.TypeDir, Mode: 0o755}); err != nil {
+		t.Fatalf("create TAR directory: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close TAR writer: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("close TAR file: %v", err)
+	}
+
+	assertArchivePreviewContains(t, rootDir, "/bundle.tar", "docs/readme.txt", "images/")
+}
+
+func TestTARGZFileListsEntries(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "bundle.tar.gz")
+	file, err := os.Create(filePath)
+	if err != nil {
+		t.Fatalf("create TAR.GZ file: %v", err)
+	}
+	gzipWriter := gzip.NewWriter(file)
+	tarWriter := tar.NewWriter(gzipWriter)
+	if err := tarWriter.WriteHeader(&tar.Header{Name: "docs/readme.txt", Size: 5, Mode: 0o600}); err != nil {
+		t.Fatalf("create TAR.GZ entry: %v", err)
+	}
+	if _, err := tarWriter.Write([]byte("hello")); err != nil {
+		t.Fatalf("write TAR.GZ entry: %v", err)
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatalf("close TAR.GZ TAR writer: %v", err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatalf("close TAR.GZ gzip writer: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("close TAR.GZ file: %v", err)
+	}
+
+	assertArchivePreviewContains(t, rootDir, "/bundle.tar.gz", "docs/readme.txt")
+}
+
+func assertArchivePreviewContains(t *testing.T, rootDir, requestPath string, entries ...string) {
+	t.Helper()
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, requestPath, nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	body := response.Body.String()
+	for _, entry := range entries {
+		if !strings.Contains(body, entry) {
+			t.Fatalf("expected archive entry %q in preview, got %q", entry, body)
+		}
+	}
+}
+
 func TestMarkdownPreviewForBrowserDisablesRawHTML(t *testing.T) {
 	rootDir := t.TempDir()
 	filePath := filepath.Join(rootDir, "README.md")
@@ -372,7 +448,7 @@ func TestNewHandlerRequiresMarkdownTemplate(t *testing.T) {
 		"assets/media.html":     {Data: []byte("media")},
 		"assets/json.html":      {Data: []byte("json")},
 		"assets/pdf.html":       {Data: []byte("pdf")},
-		"assets/zip.html":       {Data: []byte("zip")},
+		"assets/archive.html":   {Data: []byte("archive")},
 	}
 
 	_, err := NewHandler(Config{

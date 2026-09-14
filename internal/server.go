@@ -131,6 +131,12 @@ func detectContentType(filePath string) (string, error) {
 }
 
 func previewTypeByExtension(filePath string) previewType {
+	lowerPath := strings.ToLower(filePath)
+	switch {
+	case strings.HasSuffix(lowerPath, ".tar.gz"), strings.HasSuffix(lowerPath, ".tgz"):
+		return previewTypeTARGZ
+	}
+
 	switch strings.ToLower(filepath.Ext(filePath)) {
 	case ".md", ".markdown":
 		return previewTypeMarkdown
@@ -144,6 +150,8 @@ func previewTypeByExtension(filePath string) previewType {
 		return previewTypePDF
 	case ".zip":
 		return previewTypeZIP
+	case ".tar":
+		return previewTypeTAR
 	case ".json":
 		return previewTypeJSON
 	case ".txt", ".log", ".conf", ".ini", ".properties",
@@ -181,6 +189,8 @@ func previewTypeByContent(contentType string) previewType {
 		return previewTypePDF
 	case contentType == "application/zip":
 		return previewTypeZIP
+	case contentType == "application/x-tar":
+		return previewTypeTAR
 	case contentType == "application/json":
 		return previewTypeJSON
 	case strings.HasPrefix(contentType, "text/"):
@@ -207,7 +217,7 @@ func fileIcon(path string, isDir bool) string {
 	}
 
 	switch strings.ToLower(filepath.Ext(path)) {
-	case ".7z", ".bz2", ".gz", ".rar", ".tar", ".xz", ".zip":
+	case ".7z", ".bz2", ".gz", ".rar", ".tar", ".tgz", ".xz", ".zip":
 		return "📦"
 	default:
 		return "📄"
@@ -421,9 +431,9 @@ func NewHandler(config Config) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse PDF template: %w", err)
 	}
-	zipTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/zip.html")
+	archiveTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/archive.html")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse ZIP template: %w", err)
+		return nil, fmt.Errorf("failed to parse archive template: %w", err)
 	}
 	markdownTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/markdown.html")
 	if err != nil {
@@ -510,8 +520,8 @@ func NewHandler(config Config) (http.Handler, error) {
 				log.Printf("failed to render PDF preview %s: %v", r.URL.Path, err)
 			}
 
-		case previewTypeZIP:
-			if err := renderZIPPreview(w, zipTemplate, r.URL.Path, fullPath, info, config); err != nil {
+		case previewTypeZIP, previewTypeTAR, previewTypeTARGZ:
+			if err := renderArchivePreview(w, archiveTemplate, r.URL.Path, fullPath, info, config); err != nil {
 				fileServer.ServeHTTP(w, r)
 			}
 
