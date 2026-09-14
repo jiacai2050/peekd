@@ -145,6 +145,44 @@ func TestContentDetectedTextFileIsPreviewed(t *testing.T) {
 	}
 }
 
+func TestEmptyFetchDestWithoutUpgradeRequestServesRawFile(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "notes.txt")
+	if err := os.WriteFile(filePath, []byte("raw response"), 0o600); err != nil {
+		t.Fatalf("write text file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/notes.txt", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Body.String() != "raw response" {
+		t.Fatalf("expected raw file response, got %q", response.Body.String())
+	}
+}
+
+func TestEmptyFetchDestWithUpgradeRequestPreviewsFile(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "notes.txt")
+	if err := os.WriteFile(filePath, []byte("top-level navigation"), 0o600); err != nil {
+		t.Fatalf("write text file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/notes.txt", nil)
+	request.Header.Set("Upgrade-Insecure-Requests", "1")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if !strings.Contains(response.Body.String(), "top-level navigation") {
+		t.Fatalf("expected navigation request to preview file, got %q", response.Body.String())
+	}
+	if response.Header().Get("Content-Type") != "text/html; charset=utf-8" {
+		t.Fatalf("expected HTML preview response, got %q", response.Header().Get("Content-Type"))
+	}
+}
+
 func TestContentDetectedImageFileIsPreviewed(t *testing.T) {
 	rootDir := t.TempDir()
 	filePath := filepath.Join(rootDir, "image")

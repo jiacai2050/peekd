@@ -200,6 +200,18 @@ func previewTypeByContent(contentType string) previewType {
 	}
 }
 
+func isDocumentRequest(r *http.Request) bool {
+	dest := r.Header.Get("Sec-Fetch-Dest")
+	if dest == "document" {
+		return true
+	}
+	if dest == "" {
+		// Some browsers omit Sec-Fetch-Dest for LAN navigations.
+		return r.Header.Get("Upgrade-Insecure-Requests") == "1"
+	}
+	return false
+}
+
 func fileIcon(path string, isDir bool) string {
 	if isDir {
 		return "📁"
@@ -467,7 +479,7 @@ func NewHandler(config Config) (http.Handler, error) {
 			return
 		}
 
-		if r.URL.Query().Get("raw") == "1" || r.Header.Get("Sec-Fetch-Dest") != "document" {
+		if r.URL.Query().Get("raw") == "1" || !isDocumentRequest(r) {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
