@@ -243,6 +243,65 @@ func directoryEntryURL(requestPath, name string, isDir bool) string {
 	return (&url.URL{Path: entryPath}).String()
 }
 
+func setCacheHeaders(w http.ResponseWriter, info os.FileInfo) {
+	w.Header().Set("Cache-Control", "no-cache")
+	if info.ModTime().IsZero() {
+		return
+	}
+
+	modified := info.ModTime().UTC()
+	w.Header().Set("Last-Modified", modified.Format(http.TimeFormat))
+	resourceType := "file"
+	if info.IsDir() {
+		resourceType = "directory"
+	}
+	w.Header().Set("ETag", fmt.Sprintf("W/\"%s-%x-%x\"", resourceType, info.Size(), modified.UnixNano()))
+}
+
+func etagMatches(header, etag string) bool {
+	for _, candidate := range strings.Split(header, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "*" || strings.TrimPrefix(candidate, "W/") == strings.TrimPrefix(etag, "W/") {
+			return true
+		}
+	}
+	return false
+}
+
+func validateETag(w http.ResponseWriter, r *http.Request, etag string) bool {
+	w.Header().Set("ETag", etag)
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	if etagMatches(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return true
+	}
+	return false
+}
+
+func validateCache(w http.ResponseWriter, r *http.Request, info os.FileInfo) bool {
+	setCacheHeaders(w, info)
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+
+	etag := w.Header().Get("ETag")
+	if etag != "" && validateETag(w, r, etag) {
+		return true
+	}
+
+	if etag == "" {
+		return false
+	}
+	if modifiedSince, err := http.ParseTime(r.Header.Get("If-Modified-Since")); err == nil &&
+		!info.ModTime().After(modifiedSince.Add(time.Second)) {
+		w.WriteHeader(http.StatusNotModified)
+		return true
+	}
+	return false
+}
+
 func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPath string, tmpl *template.Template, projectURL string, version string) {
 	fullPath := filepath.Join(rootDir, filepath.FromSlash(requestPath))
 	entries, err := os.ReadDir(fullPath)
@@ -408,8 +467,16 @@ func NewHandler(config Config) (http.Handler, error) {
 	}
 
 	fileServer := http.FileServer(http.Dir(config.RootDir))
+	assetServer := http.StripPrefix("/__peekd_assets/", http.FileServer(http.FS(assetsFS)))
 	mux := http.NewServeMux()
-	mux.Handle("/__peekd_assets/", http.StripPrefix("/__peekd_assets/", http.FileServer(http.FS(assetsFS))))
+	mux.Handle("/__peekd_assets/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		assetETag := fmt.Sprintf("\"asset-%x-%x\"", config.Version, r.URL.Path)
+		if validateETag(w, r, assetETag) {
+			return
+		}
+		assetServer.ServeHTTP(w, r)
+	}))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		cleanedPath := filepath.Clean(r.URL.Path)
 		fullPath := filepath.Join(config.RootDir, cleanedPath)
@@ -424,6 +491,9 @@ func NewHandler(config Config) (http.Handler, error) {
 			return
 		}
 
+		if validateCache(w, r, info) {
+			return
+		}
 		if info.IsDir() {
 			renderDirectory(w, r, config.RootDir, cleanedPath, directoryTemplate, config.ProjectURL, config.Version)
 			return

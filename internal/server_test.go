@@ -125,6 +125,46 @@ func TestReadTextPreviewEnforcesLimit(t *testing.T) {
 	}
 }
 
+func TestPreviewUsesConditionalCache(t *testing.T) {
+	rootDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(rootDir, "notes.txt"), []byte("cached content"), 0o600); err != nil {
+		t.Fatalf("write test file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/notes.txt", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	etag := response.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("expected ETag")
+	}
+	if response.Header().Get("Last-Modified") == "" {
+		t.Fatal("expected Last-Modified")
+	}
+	if response.Header().Get("Cache-Control") != "no-cache" {
+		t.Fatalf("Cache-Control = %q, want no-cache", response.Header().Get("Cache-Control"))
+	}
+
+	cachedRequest := httptest.NewRequest(http.MethodGet, "/notes.txt", nil)
+	cachedRequest.Header.Set("Sec-Fetch-Dest", "document")
+	cachedRequest.Header.Set("If-None-Match", etag)
+	cachedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(cachedResponse, cachedRequest)
+
+	if cachedResponse.Code != http.StatusNotModified {
+		t.Fatalf("conditional status code = %d, want %d", cachedResponse.Code, http.StatusNotModified)
+	}
+	if cachedResponse.Body.Len() != 0 {
+		t.Fatalf("conditional response body = %q, want empty", cachedResponse.Body.String())
+	}
+}
+
 func TestContentDetectedTextFileIsPreviewed(t *testing.T) {
 	rootDir := t.TempDir()
 	filePath := filepath.Join(rootDir, "notes")
@@ -564,6 +604,21 @@ func TestAssetRouteServesEmbeddedFiles(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), "body{}") {
 		t.Fatalf("unexpected asset response: %q", response.Body.String())
+	}
+	etag := response.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("expected asset ETag")
+	}
+	if response.Header().Get("Cache-Control") != "no-cache" {
+		t.Fatalf("asset Cache-Control = %q, want no-cache", response.Header().Get("Cache-Control"))
+	}
+
+	cachedRequest := httptest.NewRequest(http.MethodGet, "/__peekd_assets/preview.css", nil)
+	cachedRequest.Header.Set("If-None-Match", etag)
+	cachedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(cachedResponse, cachedRequest)
+	if cachedResponse.Code != http.StatusNotModified {
+		t.Fatalf("conditional asset status code = %d, want %d", cachedResponse.Code, http.StatusNotModified)
 	}
 }
 

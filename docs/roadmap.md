@@ -23,9 +23,11 @@ Reject or mark unsafe absolute and `../` entry paths without extracting files.
 
 ### HTTP caching
 
-`http.FileServer` already provides `Last-Modified`, `If-Modified-Since`, and
-range handling for direct files. Add `ETag` and explicit cache policy, and
-extend conditional caching to generated preview responses and embedded assets.
+Implemented in [`caching.md`](caching.md). Peekd uses `no-cache`
+revalidation with `Last-Modified` and ETag validators for files, directories,
+generated previews, and embedded assets. A future enhancement could add
+content-hash ETags for applications that need detection when both file size and
+modification time are preserved.
 
 ## Medium priority
 
