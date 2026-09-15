@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{.Path}} - Peekd</title>
+    <title>Peekd</title>
     <link rel="stylesheet" href="/__peekd_assets/directory.css">
 </head>
 <body>
     <main class="directory">
         <header class="directory-header">
-            <div>
-                <p class="eyebrow"><a href="/">Peekd</a></p>
-                <p class="current-path">{{.Path}}</p>
-            </div>
+            <nav class="breadcrumbs" aria-label="Breadcrumb">
+                {{range $index, $item := .Breadcrumbs}}{{if $index}}<span class="breadcrumb-separator">/</span>{{end}}{{if $item.Current}}<span aria-current="page">{{$item.Name}}</span>{{else}}<a href="{{$item.URL}}">{{$item.Name}}</a>{{end}}{{end}}
+            </nav>
             <span class="entry-count">{{len .Entries}} items</span>
         </header>
 

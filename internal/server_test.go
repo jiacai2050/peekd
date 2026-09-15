@@ -73,6 +73,27 @@ func TestParseByteSize(t *testing.T) {
 	}
 }
 
+func TestPreviewBreadcrumbs(t *testing.T) {
+	directory := previewBreadcrumbs("/docs/guide", true)
+	if len(directory) != 3 {
+		t.Fatalf("directory breadcrumb count = %d, want 3", len(directory))
+	}
+	if directory[0].Name != "Peekd" || directory[0].URL != "/" || directory[0].Current {
+		t.Fatalf("unexpected root breadcrumb: %+v", directory[0])
+	}
+	if directory[1].Name != "docs" || directory[1].URL != "/docs/" || directory[1].Current {
+		t.Fatalf("unexpected parent breadcrumb: %+v", directory[1])
+	}
+	if directory[2].Name != "guide" || directory[2].URL != "/docs/guide/" || !directory[2].Current {
+		t.Fatalf("unexpected current breadcrumb: %+v", directory[2])
+	}
+
+	file := previewBreadcrumbs("/docs/my guide.txt", false)
+	if file[2].URL != "/docs/my%20guide.txt" || !file[2].Current {
+		t.Fatalf("unexpected file breadcrumb: %+v", file[2])
+	}
+}
+
 func TestListenWithFallbackUsesNextPortWhenOccupied(t *testing.T) {
 	occupied, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

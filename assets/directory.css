@@ -15,6 +15,35 @@ body {
     margin: 0 auto;
 }
 
+.breadcrumbs {
+    align-items: center;
+    color: #64748b;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+}
+
+.directory-header .breadcrumbs {
+    margin-bottom: 0;
+}
+
+.breadcrumbs a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+    text-decoration: underline;
+}
+
+.breadcrumbs [aria-current="page"] {
+    color: #172033;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
 .directory-header {
     display: flex;
     align-items: end;

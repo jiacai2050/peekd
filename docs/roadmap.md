@@ -21,24 +21,12 @@ only encodes credentials with Base64.
 Bound archive entry counts, metadata scanning, and compressed input processing.
 Reject or mark unsafe absolute and `../` entry paths without extracting files.
 
-### HTTP caching
-
-Implemented in [`caching.md`](caching.md). Peekd uses `no-cache`
-revalidation with `Last-Modified` and ETag validators for files, directories,
-generated previews, and embedded assets. A future enhancement could add
-content-hash ETags for applications that need detection when both file size and
-modification time are preserved.
-
 ## Medium priority
 
 ### Directory search and filtering
 
 Add client-side filtering for the current directory, with server-side search
 as a later option for large trees.
-
-### Breadcrumb navigation
-
-Show the current directory path as links on directory and preview pages.
 
 ### Copy actions
 

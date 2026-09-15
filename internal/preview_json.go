@@ -9,13 +9,14 @@ import (
 )
 
 type jsonPreviewData struct {
-	FileName   string
-	Content    string
-	RawURL     string
-	Size       string
-	Modified   string
-	ProjectURL string
-	Version    string
+	FileName    string
+	Content     string
+	RawURL      string
+	Size        string
+	Modified    string
+	Breadcrumbs []breadcrumb
+	ProjectURL  string
+	Version     string
 }
 
 func formatJSON(content []byte) (string, error) {
@@ -28,13 +29,14 @@ func formatJSON(content []byte) (string, error) {
 
 func renderJSONPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content string) error {
 	data := jsonPreviewData{
-		FileName:   previewFileName(filePath),
-		Content:    content,
-		RawURL:     previewRawURL(requestPath),
-		Size:       previewFileSize(info),
-		Modified:   previewModified(info),
-		ProjectURL: config.ProjectURL,
-		Version:    config.Version,
+		FileName:    previewFileName(filePath),
+		Content:     content,
+		RawURL:      previewRawURL(requestPath),
+		Size:        previewFileSize(info),
+		Modified:    previewModified(info),
+		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		ProjectURL:  config.ProjectURL,
+		Version:     config.Version,
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return tmpl.Execute(w, data)

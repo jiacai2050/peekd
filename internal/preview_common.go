@@ -3,8 +3,40 @@ package internal
 import (
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 )
+
+type breadcrumb struct {
+	Name    string
+	URL     string
+	Current bool
+}
+
+func previewBreadcrumbs(requestPath string, isDir bool) []breadcrumb {
+	breadcrumbs := []breadcrumb{{Name: "Peekd", URL: "/", Current: strings.Trim(requestPath, "/") == "" && isDir}}
+	parts := strings.Split(strings.Trim(requestPath, "/"), "/")
+	if len(parts) == 1 && parts[0] == "" {
+		return breadcrumbs
+	}
+
+	currentPath := "/"
+	for index, part := range parts {
+		currentPath = path.Join(currentPath, part)
+		current := index == len(parts)-1
+		breadcrumbURL := (&url.URL{Path: currentPath}).String()
+		if !current || isDir {
+			breadcrumbURL += "/"
+		}
+		breadcrumbs = append(breadcrumbs, breadcrumb{
+			Name:    part,
+			URL:     breadcrumbURL,
+			Current: current,
+		})
+	}
+	return breadcrumbs
+}
 
 type previewType string
 

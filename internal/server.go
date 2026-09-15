@@ -46,11 +46,11 @@ type directoryEntry struct {
 }
 
 type directoryData struct {
-	Path       string
-	HasParent  bool
-	Entries    []directoryEntry
-	ProjectURL string
-	Version    string
+	HasParent   bool
+	Entries     []directoryEntry
+	Breadcrumbs []breadcrumb
+	ProjectURL  string
+	Version     string
 }
 
 func detectContentType(filePath string) (string, error) {
@@ -310,16 +310,11 @@ func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPat
 		return
 	}
 
-	displayPath := rootDir
-	if requestPath != "/" {
-		displayPath = filepath.Join(displayPath, filepath.FromSlash(strings.TrimPrefix(requestPath, "/")))
-	}
-
 	data := directoryData{
-		Path:       displayPath,
-		HasParent:  requestPath != "/",
-		ProjectURL: projectURL,
-		Version:    version,
+		HasParent:   requestPath != "/",
+		ProjectURL:  projectURL,
+		Version:     version,
+		Breadcrumbs: previewBreadcrumbs(requestPath, true),
 	}
 
 	for _, entry := range entries {

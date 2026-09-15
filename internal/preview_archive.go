@@ -19,13 +19,14 @@ type archivePreviewEntry struct {
 }
 
 type archivePreviewData struct {
-	FileName   string
-	Entries    []archivePreviewEntry
-	RawURL     string
-	Size       string
-	Modified   string
-	ProjectURL string
-	Version    string
+	FileName    string
+	Entries     []archivePreviewEntry
+	RawURL      string
+	Size        string
+	Modified    string
+	Breadcrumbs []breadcrumb
+	ProjectURL  string
+	Version     string
 }
 
 func readZIPPreview(filePath string) ([]archivePreviewEntry, error) {
@@ -108,13 +109,14 @@ func renderArchivePreview(w http.ResponseWriter, tmpl *template.Template, reques
 		return err
 	}
 	data := archivePreviewData{
-		FileName:   previewFileName(filePath),
-		Entries:    entries,
-		RawURL:     previewRawURL(requestPath),
-		Size:       previewFileSize(info),
-		Modified:   previewModified(info),
-		ProjectURL: config.ProjectURL,
-		Version:    config.Version,
+		FileName:    previewFileName(filePath),
+		Entries:     entries,
+		RawURL:      previewRawURL(requestPath),
+		Size:        previewFileSize(info),
+		Modified:    previewModified(info),
+		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		ProjectURL:  config.ProjectURL,
+		Version:     config.Version,
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return tmpl.Execute(w, data)

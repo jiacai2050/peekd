@@ -15,14 +15,15 @@ const (
 )
 
 type csvPreviewData struct {
-	FileName   string
-	Rows       [][]string
-	Truncated  bool
-	RawURL     string
-	Size       string
-	Modified   string
-	ProjectURL string
-	Version    string
+	FileName    string
+	Rows        [][]string
+	Truncated   bool
+	RawURL      string
+	Size        string
+	Modified    string
+	Breadcrumbs []breadcrumb
+	ProjectURL  string
+	Version     string
 }
 
 func parseCSVPreview(content []byte, delimiter rune) ([][]string, bool, error) {
@@ -62,14 +63,15 @@ func renderCSVPreview(w http.ResponseWriter, tmpl *template.Template, requestPat
 		return err
 	}
 	data := csvPreviewData{
-		FileName:   previewFileName(filePath),
-		Rows:       rows,
-		Truncated:  truncated,
-		RawURL:     previewRawURL(requestPath),
-		Size:       previewFileSize(info),
-		Modified:   previewModified(info),
-		ProjectURL: config.ProjectURL,
-		Version:    config.Version,
+		FileName:    previewFileName(filePath),
+		Rows:        rows,
+		Truncated:   truncated,
+		RawURL:      previewRawURL(requestPath),
+		Size:        previewFileSize(info),
+		Modified:    previewModified(info),
+		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		ProjectURL:  config.ProjectURL,
+		Version:     config.Version,
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return tmpl.Execute(w, data)

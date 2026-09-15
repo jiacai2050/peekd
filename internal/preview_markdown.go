@@ -11,13 +11,14 @@ import (
 )
 
 type markdownPreviewData struct {
-	FileName   string
-	HTML       template.HTML
-	RawURL     string
-	Size       string
-	Modified   string
-	ProjectURL string
-	Version    string
+	FileName    string
+	HTML        template.HTML
+	RawURL      string
+	Size        string
+	Modified    string
+	Breadcrumbs []breadcrumb
+	ProjectURL  string
+	Version     string
 }
 
 var markdownRenderer = goldmark.New(
@@ -38,13 +39,14 @@ func renderMarkdownPreview(w http.ResponseWriter, tmpl *template.Template, reque
 		return err
 	}
 	data := markdownPreviewData{
-		FileName:   previewFileName(filePath),
-		HTML:       markdownHTML,
-		RawURL:     previewRawURL(requestPath),
-		Size:       previewFileSize(info),
-		Modified:   previewModified(info),
-		ProjectURL: config.ProjectURL,
-		Version:    config.Version,
+		FileName:    previewFileName(filePath),
+		HTML:        markdownHTML,
+		RawURL:      previewRawURL(requestPath),
+		Size:        previewFileSize(info),
+		Modified:    previewModified(info),
+		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		ProjectURL:  config.ProjectURL,
+		Version:     config.Version,
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return tmpl.Execute(w, data)

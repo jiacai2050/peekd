@@ -8,6 +8,9 @@
 </head>
 <body>
     <figure class="preview-container media-preview">
+        <nav class="breadcrumbs" aria-label="Breadcrumb">
+            {{range $index, $item := .Breadcrumbs}}{{if $index}}<span class="breadcrumb-separator">/</span>{{end}}{{if $item.Current}}<span aria-current="page">{{$item.Name}}</span>{{else}}<a href="{{$item.URL}}">{{$item.Name}}</a>{{end}}{{end}}
+        </nav>
         <div class="file-header">
             <div class="file-heading">
                 <div class="file-name">{{if eq .MediaKind "audio"}}🎵{{else}}🎬{{end}} {{.FileName}}</div>

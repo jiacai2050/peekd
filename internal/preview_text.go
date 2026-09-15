@@ -10,13 +10,14 @@ import (
 )
 
 type textPreviewData struct {
-	FileName   string
-	Lines      []string
-	RawURL     string
-	Size       string
-	Modified   string
-	ProjectURL string
-	Version    string
+	FileName    string
+	Lines       []string
+	RawURL      string
+	Size        string
+	Modified    string
+	Breadcrumbs []breadcrumb
+	ProjectURL  string
+	Version     string
 }
 
 func readTextPreview(filePath string, maxSize int64) ([]byte, bool, error) {
@@ -58,13 +59,14 @@ func splitLines(content string) []string {
 
 func renderTextPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content []byte) error {
 	data := textPreviewData{
-		FileName:   previewFileName(filePath),
-		Lines:      splitLines(string(content)),
-		RawURL:     previewRawURL(requestPath),
-		Size:       previewFileSize(info),
-		Modified:   previewModified(info),
-		ProjectURL: config.ProjectURL,
-		Version:    config.Version,
+		FileName:    previewFileName(filePath),
+		Lines:       splitLines(string(content)),
+		RawURL:      previewRawURL(requestPath),
+		Size:        previewFileSize(info),
+		Modified:    previewModified(info),
+		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		ProjectURL:  config.ProjectURL,
+		Version:     config.Version,
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	return tmpl.Execute(w, data)

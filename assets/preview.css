@@ -16,6 +16,31 @@ body {
     overflow: hidden;
 }
 
+.breadcrumbs {
+    align-items: center;
+    color: #6b7280;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 20px;
+    font-size: 12px;
+}
+
+.breadcrumbs a {
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+    text-decoration: underline;
+}
+
+.breadcrumbs [aria-current="page"] {
+    color: #374151;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
 .file-header {
     align-items: center;
     background: #1f2937; /* Elegant dark header */
@@ -371,6 +396,18 @@ pre {
         background: #1f2937;
         border-color: #374151;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .breadcrumbs {
+        color: #9ca3af;
+    }
+
+    .breadcrumbs a {
+        color: #93c5fd;
+    }
+
+    .breadcrumbs [aria-current="page"] {
+        color: #e5e7eb;
     }
 
     pre {
