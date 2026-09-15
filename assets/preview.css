@@ -136,6 +136,38 @@ pre {
     font-weight: 600;
 }
 
+.csv-list {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.csv-list table {
+    border-collapse: collapse;
+    min-width: 100%;
+    width: max-content;
+}
+
+.csv-list th,
+.csv-list td {
+    border: 1px solid #d1d5db;
+    max-width: 600px;
+    overflow-wrap: anywhere;
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.csv-list th {
+    background: #f3f4f6;
+    font-weight: 600;
+}
+
+.preview-notice {
+    color: #6b7280;
+    font-size: 13px;
+    padding: 0 24px;
+}
+
 .code {
     counter-reset: line;
     overflow-x: auto;
@@ -371,6 +403,19 @@ pre {
 
     .markdown-content th {
         background: #374151;
+    }
+
+    .csv-list th {
+        background: #374151;
+    }
+
+    .csv-list th,
+    .csv-list td {
+        border-color: #4b5563;
+    }
+
+    .preview-notice {
+        color: #9ca3af;
     }
 
     .image-preview,

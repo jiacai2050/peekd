@@ -47,18 +47,17 @@ This adds a useful preview with almost no new dependency or parser attack
 surface. Browsers that do not support inline PDF viewing can still download the
 original file.
 
-### CSV and TSV
+### CSV and TSV (implemented)
 
 CSV and TSV files should be rendered as bounded HTML tables.
 
-- Recognize `.csv`, `.tsv`, and matching text content when the extension is
-  absent.
+- Recognize `.csv` and `.tsv` by extension.
 - Use the standard library CSV reader for CSV.
 - Use tab-separated parsing for TSV.
 - Read at most the configured preview size and cap the number of rows and
   columns.
 - Escape every cell through `html/template`.
-- Display a truncation notice when rows, columns, or bytes exceed the limit.
+- Display a truncation notice when rows or columns exceed the limit.
 - Fall back to the text preview when parsing fails.
 
 The parser must not load an unbounded file into memory. A table preview should
@@ -148,4 +147,3 @@ the current Markdown raw-HTML safety guarantees.
 5. Add bounded ZIP and TAR listings.
 6. Consider optional Mermaid rendering only after the security and asset
    strategy is settled.
-

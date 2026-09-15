@@ -17,6 +17,8 @@ const (
 	previewTypeVideo    previewType = "video"
 	previewTypePDF      previewType = "pdf"
 	previewTypeJSON     previewType = "json"
+	previewTypeCSV      previewType = "csv"
+	previewTypeTSV      previewType = "tsv"
 	previewTypeZIP      previewType = "zip"
 	previewTypeTAR      previewType = "tar"
 	previewTypeTARGZ    previewType = "tar-gz"

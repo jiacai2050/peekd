@@ -95,6 +95,10 @@ func previewTypeByExtension(filePath string) previewType {
 		return previewTypeTAR
 	case ".json":
 		return previewTypeJSON
+	case ".csv":
+		return previewTypeCSV
+	case ".tsv":
+		return previewTypeTSV
 	case ".txt", ".log", ".conf", ".ini", ".properties",
 		".jsonc", ".yaml", ".yml", ".toml", ".xml",
 		".rst",
@@ -166,7 +170,7 @@ func fileIcon(path string, isDir bool) string {
 		return "🎵"
 	case previewTypeVideo:
 		return "🎬"
-	case previewTypeText, previewTypeMarkdown:
+	case previewTypeText, previewTypeMarkdown, previewTypeCSV, previewTypeTSV:
 		return "📄"
 	}
 
@@ -381,6 +385,10 @@ func NewHandler(config Config) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON template: %w", err)
 	}
+	csvTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/csv.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CSV template: %w", err)
+	}
 	pdfTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/pdf.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse PDF template: %w", err)
@@ -438,7 +446,7 @@ func NewHandler(config Config) (http.Handler, error) {
 
 		var content []byte
 		var formattedJSON string
-		if preview == previewTypeJSON || preview == previewTypeText || preview == previewTypeMarkdown {
+		if preview == previewTypeCSV || preview == previewTypeTSV || preview == previewTypeJSON || preview == previewTypeText || preview == previewTypeMarkdown {
 			var previewable bool
 			content, previewable, err = readPreviewContent(fullPath, info.Size(), config.MaxTextPreviewSize)
 			if err != nil {
@@ -482,6 +490,18 @@ func NewHandler(config Config) (http.Handler, error) {
 		case previewTypeJSON:
 			if err := renderJSONPreview(w, jsonTemplate, r.URL.Path, fullPath, info, config, formattedJSON); err != nil {
 				log.Printf("failed to render JSON preview %s: %v", r.URL.Path, err)
+			}
+
+		case previewTypeCSV, previewTypeTSV:
+			delimiter := ','
+			if preview == previewTypeTSV {
+				delimiter = '\t'
+			}
+			if err := renderCSVPreview(w, csvTemplate, r.URL.Path, fullPath, info, config, content, delimiter); err != nil {
+				preview = previewTypeText
+				if err := renderTextPreview(w, textTemplate, r.URL.Path, fullPath, info, config, content); err != nil {
+					log.Printf("failed to render delimited text preview %s: %v", r.URL.Path, err)
+				}
 			}
 
 		case previewTypeMarkdown:

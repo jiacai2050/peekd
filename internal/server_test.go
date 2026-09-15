@@ -24,6 +24,7 @@ var testEmbeddedFiles = fstest.MapFS{
 	"assets/image.html":     {Data: []byte("<!doctype html><body>image {{.FileName}}</body>")},
 	"assets/media.html":     {Data: []byte("<!doctype html><body>media {{.FileName}}</body>")},
 	"assets/json.html":      {Data: []byte("<!doctype html><body>json {{.FileName}}<pre>{{.Content}}</pre></body>")},
+	"assets/csv.html":       {Data: []byte("<!doctype html><body>csv {{.FileName}} {{range $i, $row := .Rows}}{{range $row}}{{.}}|{{end}}{{end}}{{if .Truncated}}truncated{{end}}</body>")},
 	"assets/pdf.html":       {Data: []byte("<!doctype html><body>pdf {{.FileName}} {{.RawURL}}</body>")},
 	"assets/archive.html":   {Data: []byte("<!doctype html><body>archive {{.FileName}} {{range .Entries}}{{.Name}}|{{.Size}}{{end}}</body>")},
 	"assets/markdown.html":  {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
@@ -245,6 +246,94 @@ func TestJSONFileIsFormatted(t *testing.T) {
 	body := response.Body.String()
 	if !strings.Contains(body, "&#34;name&#34;: &#34;peekd&#34;") || !strings.Contains(body, "&#34;enabled&#34;: true") {
 		t.Fatalf("expected formatted JSON preview, got %q", body)
+	}
+}
+
+func TestCSVFileIsRenderedAsTable(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "data.csv")
+	if err := os.WriteFile(filePath, []byte("Name,Count\nPeekd,2\n"), 0o600); err != nil {
+		t.Fatalf("write CSV file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/data.csv", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	body := response.Body.String()
+	if !strings.Contains(body, "Name|Count|Peekd|2|") {
+		t.Fatalf("expected CSV table preview, got %q", body)
+	}
+}
+
+func TestTSVFileIsRenderedAsTable(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "data.tsv")
+	if err := os.WriteFile(filePath, []byte("Name\tCount\nPeekd\t2\n"), 0o600); err != nil {
+		t.Fatalf("write TSV file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/data.tsv", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if !strings.Contains(response.Body.String(), "Name|Count|Peekd|2|") {
+		t.Fatalf("expected TSV table preview, got %q", response.Body.String())
+	}
+}
+
+func TestCSVPreviewIsBounded(t *testing.T) {
+	content := strings.Builder{}
+	for row := 0; row < csvPreviewMaxRows+1; row++ {
+		content.WriteString("a,b,c,d\n")
+	}
+
+	rows, truncated, err := parseCSVPreview([]byte(content.String()), ',')
+	if err != nil {
+		t.Fatalf("parse CSV preview: %v", err)
+	}
+	if len(rows) != csvPreviewMaxRows {
+		t.Fatalf("row count = %d, want %d", len(rows), csvPreviewMaxRows)
+	}
+	if !truncated {
+		t.Fatal("expected truncated CSV preview")
+	}
+
+	wideRow := strings.TrimSuffix(strings.Repeat("a,", csvPreviewMaxColumns), ",") + ",a\n"
+	rows, truncated, err = parseCSVPreview([]byte(wideRow), ',')
+	if err != nil {
+		t.Fatalf("parse wide CSV preview: %v", err)
+	}
+	if len(rows[0]) != csvPreviewMaxColumns {
+		t.Fatalf("column count = %d, want %d", len(rows[0]), csvPreviewMaxColumns)
+	}
+	if !truncated {
+		t.Fatal("expected truncated wide CSV preview")
+	}
+}
+
+func TestInvalidCSVFallsBackToTextPreview(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "invalid.csv")
+	if err := os.WriteFile(filePath, []byte("Name,Count\n\"unterminated\n"), 0o600); err != nil {
+		t.Fatalf("write invalid CSV file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/invalid.csv", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if strings.Contains(response.Body.String(), "truncated") || !strings.Contains(response.Body.String(), "unterminated") {
+		t.Fatalf("expected invalid CSV text fallback, got %q", response.Body.String())
 	}
 }
 
@@ -485,6 +574,7 @@ func TestNewHandlerRequiresMarkdownTemplate(t *testing.T) {
 		"assets/image.html":     {Data: []byte("image")},
 		"assets/media.html":     {Data: []byte("media")},
 		"assets/json.html":      {Data: []byte("json")},
+		"assets/csv.html":       {Data: []byte("csv")},
 		"assets/pdf.html":       {Data: []byte("pdf")},
 		"assets/archive.html":   {Data: []byte("archive")},
 	}
