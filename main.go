@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"runtime/debug"
 
@@ -60,6 +61,8 @@ func main() {
 		Version:            Version,
 		ProjectURL:         ProjectURL,
 		EmbeddedFiles:      embeddedFiles,
+		AuthUsername:       os.Getenv("PEEKD_AUTH_USER"),
+		AuthPassword:       os.Getenv("PEEKD_AUTH_PASSWORD"),
 	}); err != nil {
 		log.Fatal(err)
 	}

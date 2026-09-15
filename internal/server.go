@@ -19,6 +19,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/jiacai2050/peekd/internal/middleware"
 )
 
 type Config struct {
@@ -28,102 +30,8 @@ type Config struct {
 	Version            string
 	ProjectURL         string
 	EmbeddedFiles      fs.FS
-}
-
-type accessLogResponseWriter struct {
-	http.ResponseWriter
-	status int
-	bytes  int64
-}
-
-func (w *accessLogResponseWriter) WriteHeader(status int) {
-	if w.status != 0 {
-		return
-	}
-	w.status = status
-	w.ResponseWriter.WriteHeader(status)
-}
-
-func (w *accessLogResponseWriter) Write(data []byte) (int, error) {
-	if w.status == 0 {
-		w.WriteHeader(http.StatusOK)
-	}
-	n, err := w.ResponseWriter.Write(data)
-	w.bytes += int64(n)
-	return n, err
-}
-
-func (w *accessLogResponseWriter) ReadFrom(reader io.Reader) (int64, error) {
-	if w.status == 0 {
-		w.WriteHeader(http.StatusOK)
-	}
-
-	if readerFrom, ok := w.ResponseWriter.(io.ReaderFrom); ok {
-		n, err := readerFrom.ReadFrom(reader)
-		w.bytes += n
-		return n, err
-	}
-
-	return io.Copy(struct{ io.Writer }{Writer: w}, reader)
-}
-
-func (w *accessLogResponseWriter) Flush() {
-	if w.status == 0 {
-		w.WriteHeader(http.StatusOK)
-	}
-	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
-		flusher.Flush()
-	}
-}
-
-func accessLogField(value string) string {
-	value = strings.ReplaceAll(value, `\`, `\\`)
-	return strings.ReplaceAll(value, `"`, `\"`)
-}
-
-func accessLogClientAddress(remoteAddr string) string {
-	host, _, err := net.SplitHostPort(remoteAddr)
-	if err == nil {
-		return host
-	}
-	if remoteAddr == "" {
-		return "-"
-	}
-	return remoteAddr
-}
-
-func withAccessLog(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/__peekd_assets/") {
-			handler.ServeHTTP(w, r)
-			return
-		}
-
-		start := time.Now()
-		response := &accessLogResponseWriter{ResponseWriter: w}
-		handler.ServeHTTP(response, r)
-		if response.status == 0 {
-			response.status = http.StatusOK
-		}
-		requestLine := fmt.Sprintf("%s %s %s", r.Method, r.URL.RequestURI(), r.Proto)
-		referer := r.Referer()
-		if referer == "" {
-			referer = "-"
-		}
-		userAgent := r.UserAgent()
-		if userAgent == "" {
-			userAgent = "-"
-		}
-		log.Printf(`%s "%s" %d %d %s "%s" "%s"`,
-			accessLogClientAddress(r.RemoteAddr),
-			accessLogField(requestLine),
-			response.status,
-			response.bytes,
-			time.Since(start).Round(time.Microsecond),
-			accessLogField(referer),
-			accessLogField(userAgent),
-		)
-	})
+	AuthUsername       string
+	AuthPassword       string
 }
 
 type directoryEntry struct {
@@ -591,7 +499,13 @@ func NewHandler(config Config) (http.Handler, error) {
 		}
 	})
 
-	return withAccessLog(mux), nil
+	authMiddleware, err := middleware.NewBasicAuth(config.AuthUsername, config.AuthPassword)
+	if err != nil {
+		return nil, err
+	}
+	// Requests pass through access logging, then Basic Auth, then the mux.
+	// Responses return in reverse order, so access logging records the result last.
+	return middleware.WithAccessLog(authMiddleware(mux)), nil
 }
 
 func Run(config Config) error {

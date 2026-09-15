@@ -76,6 +76,19 @@ Show version information:
 peekd -version
 ```
 
+## Basic authentication
+
+Set both environment variables to protect the server with HTTP Basic
+Authentication:
+
+```bash
+PEEKD_AUTH_USER=admin PEEKD_AUTH_PASSWORD=secret peekd
+```
+
+If only one variable is set, Peekd refuses to start. Basic Authentication
+encodes credentials rather than encrypting them, so use HTTPS or a trusted
+network when protecting sensitive files.
+
 ## Resumable downloads
 
 Direct file responses support HTTP range requests. Resume an interrupted
