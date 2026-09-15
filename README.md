@@ -55,8 +55,11 @@ peekd -root ~/Downloads -addr :9000
 If the selected port is occupied, Peekd tries the next port automatically.
 
 Peekd uses the browser `Sec-Fetch-Dest` header to distinguish document
-navigation from subresource requests. Markdown images and media therefore load
-as original files without special query parameters.
+navigation from subresource requests. Some browsers omit this header for LAN
+navigation, so `Upgrade-Insecure-Requests: 1` is used as a fallback. This
+header is normally sent only for top-level navigation, not subresources.
+Markdown images and media therefore load as original files without special
+query parameters. Add `?raw=1` to force the original file response.
 
 Change the maximum Markdown and text preview size:
 

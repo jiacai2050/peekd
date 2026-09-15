@@ -76,6 +76,22 @@ func (w *accessLogResponseWriter) Flush() {
 	}
 }
 
+func accessLogField(value string) string {
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	return strings.ReplaceAll(value, `"`, `\"`)
+}
+
+func accessLogClientAddress(remoteAddr string) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err == nil {
+		return host
+	}
+	if remoteAddr == "" {
+		return "-"
+	}
+	return remoteAddr
+}
+
 func withAccessLog(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/__peekd_assets/") {
@@ -89,7 +105,24 @@ func withAccessLog(handler http.Handler) http.Handler {
 		if response.status == 0 {
 			response.status = http.StatusOK
 		}
-		log.Printf("%s %s %d %d %s", r.Method, r.URL.RequestURI(), response.status, response.bytes, time.Since(start).Round(time.Microsecond))
+		requestLine := fmt.Sprintf("%s %s %s", r.Method, r.URL.RequestURI(), r.Proto)
+		referer := r.Referer()
+		if referer == "" {
+			referer = "-"
+		}
+		userAgent := r.UserAgent()
+		if userAgent == "" {
+			userAgent = "-"
+		}
+		log.Printf(`%s "%s" %d %d %s "%s" "%s"`,
+			accessLogClientAddress(r.RemoteAddr),
+			accessLogField(requestLine),
+			response.status,
+			response.bytes,
+			time.Since(start).Round(time.Microsecond),
+			accessLogField(referer),
+			accessLogField(userAgent),
+		)
 	})
 }
 
@@ -206,7 +239,8 @@ func isDocumentRequest(r *http.Request) bool {
 		return true
 	}
 	if dest == "" {
-		// Some browsers omit Sec-Fetch-Dest for LAN navigations.
+		// Some browsers omit Sec-Fetch-Dest for LAN navigations. This header
+		// usually appears only on top-level navigations, not subresources.
 		return r.Header.Get("Upgrade-Insecure-Requests") == "1"
 	}
 	return false
