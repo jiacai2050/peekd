@@ -1,2 +1,4 @@
-github.com/yuin/goldmark v1.7.13 h1:GPddIs617DnBLFFVJFgpo1aBfe/4xcvMc3SB5t/D0pA=
-github.com/yuin/goldmark v1.7.13/go.mod h1:ip/1k0VRfGynBgxOz0yCqHrbZXhcjxyuS66Brc7iBKg=
+github.com/yuin/goldmark-diagram v1.0.1 h1:/JL/Yu05QRxu53PLrPCbEGzMfVtL8a8O0MDT9glt7aw=
+github.com/yuin/goldmark-diagram v1.0.1/go.mod h1:HG3v28Xox4mOl8+mPWcD6w74TDKjo1l+ljMt8CHdQZg=
+github.com/yuin/goldmark/v2 v2.0.0 h1:P6JP1Px30eqo339He8dDFE8D0BSM21eQcbozLWH+E6g=
+github.com/yuin/goldmark/v2 v2.0.0/go.mod h1:G6M4/qOFtfn01/o14BU1UR2Lo5N3S9Qo7xCuz/sHjGQ=

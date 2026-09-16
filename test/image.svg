@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160" viewBox="0 0 320 160">
+  <rect width="320" height="160" rx="16" fill="#172033"/>
+  <circle cx="90" cy="80" r="42" fill="#60a5fa"/>
+  <path d="M150 110 205 50l55 60z" fill="#34d399"/>
+  <text x="160" y="145" fill="white" text-anchor="middle" font-family="sans-serif">Peekd image preview</text>
+</svg>

@@ -1,0 +1,3 @@
+Plain text preview fixture.
+
+This file also provides a simple raw-file fallback target.

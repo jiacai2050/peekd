@@ -542,6 +542,34 @@ func TestMarkdownPreviewForBrowserDisablesRawHTML(t *testing.T) {
 	}
 }
 
+func TestMarkdownPreviewRendersMermaid(t *testing.T) {
+	rendered, err := renderMarkdown([]byte("```mermaid\ngraph LR\n    A --> B\n```\n"))
+	if err != nil {
+		t.Fatalf("render Mermaid markdown: %v", err)
+	}
+	body := string(rendered)
+	if !strings.Contains(body, `<pre class="mermaid">`) {
+		t.Fatalf("expected Mermaid block, got %q", body)
+	}
+	if !strings.Contains(body, `<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>`) {
+		t.Fatalf("expected Mermaid script, got %q", body)
+	}
+}
+
+func TestMarkdownPreviewRendersExtendedSyntax(t *testing.T) {
+	rendered, err := renderMarkdown([]byte("Term\n: Definition\n\nText[^1]\n\n[^1]: Note\n"))
+	if err != nil {
+		t.Fatalf("render extended Markdown: %v", err)
+	}
+	body := string(rendered)
+	if !strings.Contains(body, "<dl>") || !strings.Contains(body, "<dt>Term</dt>") {
+		t.Fatalf("expected definition list, got %q", body)
+	}
+	if !strings.Contains(body, "footnote") {
+		t.Fatalf("expected footnote output, got %q", body)
+	}
+}
+
 func TestMarkdownFileDefaultsToRaw(t *testing.T) {
 	rootDir := t.TempDir()
 	filePath := filepath.Join(rootDir, "README.markdown")

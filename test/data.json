@@ -1,0 +1,8 @@
+{
+  "name": "Peekd",
+  "features": ["preview", "range", "cache"],
+  "enabled": true,
+  "nested": {
+    "answer": 42
+  }
+}

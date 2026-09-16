@@ -29,6 +29,10 @@ The existing text and Markdown preview limit should remain the default limit
 for textual formats. Structured and archive formats may use a smaller limit
 because parsing can expand memory usage.
 
+Markdown previews use GFM plus footnotes, definition lists, and CJK-aware
+parsing and line breaks. Typographic substitutions remain disabled so code and
+technical documentation keep their original punctuation.
+
 ## High Priority
 
 ### PDF
@@ -114,16 +118,18 @@ additional limits.
 
 ### Mermaid in Markdown
 
-Mermaid support should remain optional and client-side.
+Mermaid support is implemented through
+[`goldmark-diagram`](https://github.com/yuin/goldmark-diagram) and remains
+client-side.
 
-- Detect fenced `mermaid` blocks during Markdown rendering.
-- Render them as escaped code or a dedicated placeholder by default.
-- If client-side rendering is added, use a pinned and bundled asset.
-- Do not execute arbitrary scripts from Markdown.
-- Apply a maximum diagram count and source size.
+- Fenced `mermaid` blocks render as escaped `<pre class="mermaid">` elements.
+- The generated page loads MermaidJS from the CDN URL configured by
+  `goldmark-diagram` and renders the diagrams in the browser.
+- The Mermaid source is escaped and Markdown raw HTML remains disabled.
+- Rendering requires browser access to the external MermaidJS CDN script.
 
-Mermaid is useful, but it should not introduce a runtime dependency or weaken
-the current Markdown raw-HTML safety guarantees.
+PlantUML support from `goldmark-diagram` is intentionally not enabled because
+it requires a local `plantuml` executable and is outside Peekd's preview scope.
 
 ## Rendering and Security Rules
 
@@ -145,5 +151,3 @@ the current Markdown raw-HTML safety guarantees.
 3. Add formatted JSON previews with text fallback.
 4. Add safe XML formatting.
 5. Add bounded ZIP and TAR listings.
-6. Consider optional Mermaid rendering only after the security and asset
-   strategy is settled.

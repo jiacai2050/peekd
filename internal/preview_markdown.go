@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/extension"
+	diagram "github.com/yuin/goldmark-diagram"
+	"github.com/yuin/goldmark/v2/extension"
+	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/renderer/html"
 )
 
 type markdownPreviewData struct {
@@ -22,13 +24,30 @@ type markdownPreviewData struct {
 	Version     string
 }
 
-var markdownRenderer = goldmark.New(
-	goldmark.WithExtensions(extension.GFM),
+var markdownParser = parser.New(
+	parser.WithExtensions(
+		extension.GFMParser,
+		extension.FootnoteParser,
+		extension.DefinitionListParser,
+	),
+	parser.WithEscapedSpace(),
 )
+var markdownRenderer = html.New(html.WithExtensions(
+	extension.GFMHTMLRenderer,
+	extension.FootnoteHTMLRenderer,
+	extension.DefinitionListHTMLRenderer,
+	diagram.NewHTMLRenderer(diagram.WithRenderer(
+		diagram.LanguageMermaid,
+		diagram.NewMermaidClientRenderer(diagram.WithMermaidUMDURL(
+			"https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js",
+		)),
+	)),
+), html.WithLineBreakStrategy(html.SimpleEastAsianLineBreakStrategy))
 
 func renderMarkdown(content []byte) (template.HTML, error) {
 	var output bytes.Buffer
-	if err := markdownRenderer.Convert(content, &output); err != nil {
+	node := markdownParser.Parse(content)
+	if err := markdownRenderer.Render(&output, content, node); err != nil {
 		return "", err
 	}
 	return template.HTML(output.String()), nil
