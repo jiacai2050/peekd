@@ -12,7 +12,10 @@
             <nav class="breadcrumbs" aria-label="Breadcrumb">
                 {{range $index, $item := .Breadcrumbs}}{{if $index}}<span class="breadcrumb-separator">/</span>{{end}}{{if $item.Current}}<span aria-current="page">{{$item.Name}}</span>{{else}}<a href="{{$item.URL}}">{{$item.Name}}</a>{{end}}{{end}}
             </nav>
-            <span class="entry-count">{{len .Entries}} items</span>
+            <div class="directory-actions">
+                <button class="copy-button" type="button" data-copy-path="{{.LocalPath}}">Copy local path</button>
+                <span class="entry-count">{{len .Entries}} items</span>
+            </div>
         </header>
 
         <section class="file-list">
@@ -48,5 +51,6 @@
             </div>
         </footer>
     </main>
+    <script src="/__peekd_assets/copy.js"></script>
 </body>
 </html>

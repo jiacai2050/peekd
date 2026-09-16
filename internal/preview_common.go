@@ -64,6 +64,10 @@ func previewFileName(filePath string) string {
 	return filepath.Base(filePath)
 }
 
+func previewLocalPath(filePath string) string {
+	return filepath.Clean(filePath)
+}
+
 func previewModified(info os.FileInfo) string {
 	return info.ModTime().Format("2006-01-02 15:04:05")
 }

@@ -83,6 +83,12 @@ body {
     background: #374151;
 }
 
+.copy-button {
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+}
+
 .header-actions {
     display: flex;
     gap: 8px;

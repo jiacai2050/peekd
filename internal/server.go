@@ -49,6 +49,7 @@ type directoryData struct {
 	HasParent   bool
 	Entries     []directoryEntry
 	Breadcrumbs []breadcrumb
+	LocalPath   string
 	ProjectURL  string
 	Version     string
 }
@@ -315,6 +316,7 @@ func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPat
 		ProjectURL:  projectURL,
 		Version:     version,
 		Breadcrumbs: previewBreadcrumbs(requestPath, true),
+		LocalPath:   previewLocalPath(fullPath),
 	}
 
 	for _, entry := range entries {

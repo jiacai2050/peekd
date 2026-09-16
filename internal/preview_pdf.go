@@ -12,6 +12,7 @@ type pdfPreviewData struct {
 	Size        string
 	Modified    string
 	Breadcrumbs []breadcrumb
+	LocalPath   string
 	ProjectURL  string
 	Version     string
 }
@@ -23,6 +24,7 @@ func renderPDFPreview(w http.ResponseWriter, tmpl *template.Template, requestPat
 		Size:        previewFileSize(info),
 		Modified:    previewModified(info),
 		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		LocalPath:   previewLocalPath(filePath),
 		ProjectURL:  config.ProjectURL,
 		Version:     config.Version,
 	}

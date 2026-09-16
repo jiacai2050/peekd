@@ -15,6 +15,7 @@ type jsonPreviewData struct {
 	Size        string
 	Modified    string
 	Breadcrumbs []breadcrumb
+	LocalPath   string
 	ProjectURL  string
 	Version     string
 }
@@ -35,6 +36,7 @@ func renderJSONPreview(w http.ResponseWriter, tmpl *template.Template, requestPa
 		Size:        previewFileSize(info),
 		Modified:    previewModified(info),
 		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		LocalPath:   previewLocalPath(filePath),
 		ProjectURL:  config.ProjectURL,
 		Version:     config.Version,
 	}
