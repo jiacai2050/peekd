@@ -33,6 +33,10 @@ Markdown previews use GFM plus footnotes, definition lists, and CJK-aware
 parsing and line breaks. Typographic substitutions remain disabled so code and
 technical documentation keep their original punctuation.
 
+HTML files are rendered in a sandboxed iframe without scripts, same-origin
+access, forms, popups, or downloads. Use `raw=1` when the original HTML
+response is needed.
+
 ## High Priority
 
 ### PDF

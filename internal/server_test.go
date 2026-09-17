@@ -20,6 +20,7 @@ import (
 
 var testEmbeddedFiles = fstest.MapFS{
 	"assets/text.html":      {Data: []byte("<!doctype html><body>{{range .Lines}}{{.}}\n{{end}}</body>")},
+	"assets/html.html":      {Data: []byte("<!doctype html><body>html {{.FileName}}<iframe sandbox srcdoc=\"{{.Content}}\"></iframe></body>")},
 	"assets/directory.html": {Data: []byte("<!doctype html><body><a href=\"/\">Peekd</a>{{if .HasParent}}<a href=\"../\">Parent directory</a>{{end}}{{range .Entries}}<div class=\"entry\">{{.Name}}|{{.URL}}|{{.FileModeBits}}|{{.Modified}}</div>{{end}}</body>")},
 	"assets/image.html":     {Data: []byte("<!doctype html><body>image {{.FileName}}</body>")},
 	"assets/media.html":     {Data: []byte("<!doctype html><body>media {{.FileName}}</body>")},
@@ -221,6 +222,32 @@ func TestEmptyFetchDestWithoutUpgradeRequestServesRawFile(t *testing.T) {
 
 	if response.Body.String() != "raw response" {
 		t.Fatalf("expected raw file response, got %q", response.Body.String())
+	}
+}
+
+func TestHTMLFileUsesSandboxedPreview(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "page.html")
+	content := []byte("<!doctype html><script>alert('blocked')</script><p>safe preview</p>")
+	if err := os.WriteFile(filePath, content, 0o600); err != nil {
+		t.Fatalf("write HTML file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/page.html", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	body := response.Body.String()
+	if !strings.Contains(body, `iframe sandbox`) {
+		t.Fatalf("expected sandboxed HTML iframe, got %q", body)
+	}
+	if !strings.Contains(body, "safe preview") || !strings.Contains(body, "alert") {
+		t.Fatalf("expected original HTML in srcdoc, got %q", body)
 	}
 }
 
@@ -674,6 +701,7 @@ func TestAssetRouteServesEmbeddedFiles(t *testing.T) {
 func TestNewHandlerRequiresMarkdownTemplate(t *testing.T) {
 	missingMarkdownTemplate := fstest.MapFS{
 		"assets/text.html":      {Data: []byte("text")},
+		"assets/html.html":      {Data: []byte("html")},
 		"assets/directory.html": {Data: []byte("directory")},
 		"assets/image.html":     {Data: []byte("image")},
 		"assets/media.html":     {Data: []byte("media")},

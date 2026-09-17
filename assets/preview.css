@@ -16,6 +16,13 @@ body {
     overflow: hidden;
 }
 
+.html-preview {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 60px);
+}
+
 .breadcrumbs {
     align-items: center;
     color: #6b7280;
@@ -92,6 +99,16 @@ body {
 .header-actions {
     display: flex;
     gap: 8px;
+}
+
+.html-frame {
+    background: #ffffff;
+    border: 0;
+    display: block;
+    flex: 1;
+    height: auto;
+    min-height: 500px;
+    width: 100%;
 }
 
 pre {

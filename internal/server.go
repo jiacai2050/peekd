@@ -96,6 +96,8 @@ func previewTypeByExtension(filePath string) previewType {
 		return previewTypeTAR
 	case ".json":
 		return previewTypeJSON
+	case ".html", ".htm":
+		return previewTypeHTML
 	case ".csv":
 		return previewTypeCSV
 	case ".tsv":
@@ -103,7 +105,7 @@ func previewTypeByExtension(filePath string) previewType {
 	case ".txt", ".log", ".conf", ".ini", ".properties",
 		".jsonc", ".yaml", ".yml", ".toml", ".xml",
 		".rst",
-		".html", ".htm", ".css", ".scss", ".sass", ".less",
+		".css", ".scss", ".sass", ".less",
 		".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
 		".vue", ".svelte",
 		".go", ".rs", ".zig", ".py", ".rb", ".php",
@@ -173,6 +175,8 @@ func fileIcon(path string, isDir bool) string {
 		return "🎬"
 	case previewTypeText, previewTypeMarkdown, previewTypeCSV, previewTypeTSV:
 		return "📄"
+	case previewTypeHTML:
+		return "🌐"
 	}
 
 	switch strings.ToLower(filepath.Ext(path)) {
@@ -425,6 +429,10 @@ func NewHandler(config Config) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse embedded template: %w", err)
 	}
+	htmlTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/html.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HTML template: %w", err)
+	}
 	directoryTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/directory.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse directory template: %w", err)
@@ -513,7 +521,7 @@ func NewHandler(config Config) (http.Handler, error) {
 
 		var content []byte
 		var formattedJSON string
-		if preview == previewTypeCSV || preview == previewTypeTSV || preview == previewTypeJSON || preview == previewTypeText || preview == previewTypeMarkdown {
+		if preview == previewTypeHTML || preview == previewTypeCSV || preview == previewTypeTSV || preview == previewTypeJSON || preview == previewTypeText || preview == previewTypeMarkdown {
 			var previewable bool
 			content, previewable, err = readPreviewContent(fullPath, info.Size(), config.MaxTextPreviewSize)
 			if err != nil {
@@ -534,6 +542,11 @@ func NewHandler(config Config) (http.Handler, error) {
 		}
 
 		switch preview {
+		case previewTypeHTML:
+			if err := renderHTMLPreview(w, htmlTemplate, r.URL.Path, fullPath, info, config, content); err != nil {
+				log.Printf("failed to render HTML preview %s: %v", r.URL.Path, err)
+			}
+
 		case previewTypeImage:
 			if err := renderImagePreview(w, imageTemplate, r.URL.Path, fullPath, info, config); err != nil {
 				log.Printf("failed to render image preview %s: %v", r.URL.Path, err)

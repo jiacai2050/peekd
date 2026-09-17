@@ -7,13 +7,13 @@
     <link rel="stylesheet" href="/__peekd_assets/preview.css">
 </head>
 <body>
-    <main class="preview-container pdf-preview">
+    <main class="preview-container html-preview">
         <nav class="breadcrumbs" aria-label="Breadcrumb">
             {{range $index, $item := .Breadcrumbs}}{{if $index}}<span class="breadcrumb-separator">/</span>{{end}}{{if $item.Current}}<span aria-current="page">{{$item.Name}}</span>{{else}}<a href="{{$item.URL}}">{{$item.Name}}</a>{{end}}{{end}}
         </nav>
         <div class="file-header">
             <div class="file-heading">
-                <div class="file-name">📄 {{.FileName}}</div>
+                <div class="file-name">🌐 {{.FileName}}</div>
                 <div class="file-meta">
                     <span>{{.Size}}</span>
                     <span>Modified {{.Modified}}</span>
@@ -25,7 +25,7 @@
                 <a class="download-button" href="{{.RawURL}}" download>Download original</a>
             </div>
         </div>
-        <iframe class="pdf-frame" sandbox referrerpolicy="no-referrer" src="{{.RawURL}}" title="{{.FileName}}"></iframe>
+        <iframe class="html-frame" sandbox referrerpolicy="no-referrer" srcdoc="{{.Content}}" title="{{.FileName}}"></iframe>
         <footer class="site-footer">
             <div>
                 <strong>Peekd</strong>

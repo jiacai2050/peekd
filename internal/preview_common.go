@@ -43,6 +43,7 @@ type previewType string
 const (
 	previewTypeNone     previewType = ""
 	previewTypeText     previewType = "text"
+	previewTypeHTML     previewType = "html"
 	previewTypeMarkdown previewType = "markdown"
 	previewTypeImage    previewType = "image"
 	previewTypeAudio    previewType = "audio"
