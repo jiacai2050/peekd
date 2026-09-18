@@ -57,15 +57,13 @@ original file.
 
 ### CSV and TSV (implemented)
 
-CSV and TSV files should be rendered as bounded HTML tables.
+CSV and TSV files should be rendered as HTML tables.
 
 - Recognize `.csv` and `.tsv` by extension.
 - Use the standard library CSV reader for CSV.
 - Use tab-separated parsing for TSV.
-- Read at most the configured preview size and cap the number of rows and
-  columns.
+- Read at most the configured preview size.
 - Escape every cell through `html/template`.
-- Display a truncation notice when rows or columns exceed the limit.
 - Fall back to the text preview when parsing fails.
 
 The parser must not load an unbounded file into memory. A table preview should
@@ -151,7 +149,7 @@ it requires a local `plantuml` executable and is outside Peekd's preview scope.
 ## Suggested Implementation Order
 
 1. Add PDF preview using the browser's native viewer.
-2. Add CSV and TSV table previews with strict row and column limits.
+2. Add CSV and TSV table previews with the existing text size limit.
 3. Add formatted JSON previews with text fallback.
 4. Add safe XML formatting.
 5. Add bounded ZIP and TAR listings.

@@ -1,41 +1,31 @@
-package internal
+package preview
 
 import (
-	"bytes"
-	"encoding/json"
 	"html/template"
 	"net/http"
 	"os"
 )
 
-type jsonPreviewData struct {
+type htmlPreviewData struct {
 	FileName    string
 	Content     string
 	RawURL      string
 	Size        string
 	Modified    string
-	Breadcrumbs []breadcrumb
+	Breadcrumbs []Breadcrumb
 	LocalPath   string
 	ProjectURL  string
 	Version     string
 }
 
-func formatJSON(content []byte) (string, error) {
-	var output bytes.Buffer
-	if err := json.Indent(&output, content, "", "  "); err != nil {
-		return "", err
-	}
-	return output.String(), nil
-}
-
-func renderJSONPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content string) error {
-	data := jsonPreviewData{
+func RenderHTMLPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content string) error {
+	data := htmlPreviewData{
 		FileName:    previewFileName(filePath),
 		Content:     content,
 		RawURL:      previewRawURL(requestPath),
 		Size:        previewFileSize(info),
 		Modified:    previewModified(info),
-		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		Breadcrumbs: Breadcrumbs(requestPath, false),
 		LocalPath:   previewLocalPath(filePath),
 		ProjectURL:  config.ProjectURL,
 		Version:     config.Version,

@@ -1,4 +1,4 @@
-package internal
+package preview
 
 import (
 	"archive/tar"
@@ -24,7 +24,7 @@ type archivePreviewData struct {
 	RawURL      string
 	Size        string
 	Modified    string
-	Breadcrumbs []breadcrumb
+	Breadcrumbs []Breadcrumb
 	LocalPath   string
 	ProjectURL  string
 	Version     string
@@ -42,7 +42,7 @@ func readZIPPreview(filePath string) ([]archivePreviewEntry, error) {
 		isDir := file.FileInfo().IsDir()
 		size := "-"
 		if !isDir {
-			size = formatFileSize(int64(file.UncompressedSize64))
+			size = FormatFileSize(int64(file.UncompressedSize64))
 		}
 		entries = append(entries, archivePreviewEntry{
 			Name:     file.Name,
@@ -86,7 +86,7 @@ func readTARPreview(filePath string) ([]archivePreviewEntry, error) {
 		isDir := header.Typeflag == tar.TypeDir
 		size := "-"
 		if !isDir {
-			size = formatFileSize(header.Size)
+			size = FormatFileSize(header.Size)
 		}
 		entries = append(entries, archivePreviewEntry{
 			Name:     header.Name,
@@ -104,7 +104,7 @@ func readArchivePreview(filePath string) ([]archivePreviewEntry, error) {
 	return readTARPreview(filePath)
 }
 
-func renderArchivePreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config) error {
+func RenderArchivePreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config) error {
 	entries, err := readArchivePreview(filePath)
 	if err != nil {
 		return err
@@ -115,7 +115,7 @@ func renderArchivePreview(w http.ResponseWriter, tmpl *template.Template, reques
 		RawURL:      previewRawURL(requestPath),
 		Size:        previewFileSize(info),
 		Modified:    previewModified(info),
-		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		Breadcrumbs: Breadcrumbs(requestPath, false),
 		LocalPath:   previewLocalPath(filePath),
 		ProjectURL:  config.ProjectURL,
 		Version:     config.Version,

@@ -39,12 +39,12 @@ preview.
 Preview selection first checks the filename extension and then falls back to
 content sniffing. Text, Markdown, and JSON content is read through the shared
 bounded preview reader. JSON is formatted with the standard library and falls
-back to text when invalid. Markdown is rendered with Goldmark. Images,
+back to text when invalid. Markdown is rendered with Goldmark. CSV/TSV previews
+use `encoding/csv` parsing and render escaped tables. They are bounded by the
+configured preview file size, without separate row or column limits. Images,
 audio/video, PDF, and ZIP/TAR/TAR.GZ archives each have format-specific
-CSV/TSV previews use bounded `encoding/csv` parsing and render escaped tables.
-Images, audio/video, PDF, and ZIP/TAR/TAR.GZ archives each have
-format-specific renderers and templates. Archive previews list entries without
-extracting files.
+renderers and templates. Archive previews list entries without extracting
+files.
 
 Direct file responses intentionally remain on `http.FileServer` so range
 requests and platform file-serving optimizations are preserved. `raw=1`

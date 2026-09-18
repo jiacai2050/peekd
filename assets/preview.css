@@ -126,6 +126,18 @@ pre {
     white-space: pre;
 }
 
+.xml-content {
+    background: #f9fafb;
+    color: #111827;
+    font-family: "SF Mono", Monaco, "Andale Mono", monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0;
+    overflow-x: auto;
+    padding: 24px;
+    white-space: pre;
+}
+
 .archive-list {
     overflow-x: auto;
 }

@@ -1,4 +1,4 @@
-package internal
+package preview
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ type markdownPreviewData struct {
 	RawURL      string
 	Size        string
 	Modified    string
-	Breadcrumbs []breadcrumb
+	Breadcrumbs []Breadcrumb
 	LocalPath   string
 	ProjectURL  string
 	Version     string
@@ -44,27 +44,23 @@ var markdownRenderer = html.New(html.WithExtensions(
 	)),
 ), html.WithLineBreakStrategy(html.SimpleEastAsianLineBreakStrategy))
 
-func renderMarkdown(content []byte) (template.HTML, error) {
+func RenderMarkdown(content []byte) (string, error) {
 	var output bytes.Buffer
 	node := markdownParser.Parse(content)
 	if err := markdownRenderer.Render(&output, content, node); err != nil {
 		return "", err
 	}
-	return template.HTML(output.String()), nil
+	return output.String(), nil
 }
 
-func renderMarkdownPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content []byte) error {
-	markdownHTML, err := renderMarkdown(content)
-	if err != nil {
-		return err
-	}
+func RenderMarkdownPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, markdownHTML string) error {
 	data := markdownPreviewData{
 		FileName:    previewFileName(filePath),
-		HTML:        markdownHTML,
+		HTML:        template.HTML(markdownHTML),
 		RawURL:      previewRawURL(requestPath),
 		Size:        previewFileSize(info),
 		Modified:    previewModified(info),
-		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		Breadcrumbs: Breadcrumbs(requestPath, false),
 		LocalPath:   previewLocalPath(filePath),
 		ProjectURL:  config.ProjectURL,
 		Version:     config.Version,

@@ -13,9 +13,8 @@
         </nav>
         <div class="file-header">
             <div class="file-heading">
-                <div class="file-name">📊 {{.FileName}}</div>
+                <div class="file-name">🧾 {{.FileName}}</div>
                 <div class="file-meta">
-                    <span>{{len .Rows}} rows</span>
                     <span>{{.Size}}</span>
                     <span>Modified {{.Modified}}</span>
                 </div>
@@ -26,19 +25,7 @@
                 <a class="download-button" href="{{.RawURL}}" download>Download original</a>
             </div>
         </div>
-        <div class="csv-list">
-            <table>
-                {{range $rowIndex, $row := .Rows}}
-                <tr>
-                    {{range $row}}
-                    {{if eq $rowIndex 0}}<th>{{.}}</th>{{else}}<td>{{.}}</td>{{end}}
-                    {{end}}
-                </tr>
-                {{else}}
-                <tr><td>No rows found.</td></tr>
-                {{end}}
-            </table>
-        </div>
+        <pre class="xml-content"><code>{{.Content}}</code></pre>
         <footer class="site-footer">
             <div>
                 <strong>Peekd</strong>

@@ -16,6 +16,8 @@ import (
 	"testing"
 	"testing/fstest"
 	"time"
+
+	"github.com/jiacai2050/peekd/internal/preview"
 )
 
 var testEmbeddedFiles = fstest.MapFS{
@@ -25,7 +27,8 @@ var testEmbeddedFiles = fstest.MapFS{
 	"assets/image.html":     {Data: []byte("<!doctype html><body>image {{.FileName}}</body>")},
 	"assets/media.html":     {Data: []byte("<!doctype html><body>media {{.FileName}}</body>")},
 	"assets/json.html":      {Data: []byte("<!doctype html><body>json {{.FileName}}<pre>{{.Content}}</pre></body>")},
-	"assets/csv.html":       {Data: []byte("<!doctype html><body>csv {{.FileName}} {{range $i, $row := .Rows}}{{range $row}}{{.}}|{{end}}{{end}}{{if .Truncated}}truncated{{end}}</body>")},
+	"assets/xml.html":       {Data: []byte("<!doctype html><body>xml {{.FileName}}<pre>{{.Content}}</pre></body>")},
+	"assets/csv.html":       {Data: []byte("<!doctype html><body>csv {{.FileName}} {{range $row := .Rows}}{{range $row}}{{.}}|{{end}}{{end}}</body>")},
 	"assets/pdf.html":       {Data: []byte("<!doctype html><body>pdf {{.FileName}} {{.RawURL}}</body>")},
 	"assets/archive.html":   {Data: []byte("<!doctype html><body>archive {{.FileName}} {{range .Entries}}{{.Name}}|{{.Size}}{{end}}</body>")},
 	"assets/markdown.html":  {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
@@ -75,7 +78,7 @@ func TestParseByteSize(t *testing.T) {
 }
 
 func TestPreviewBreadcrumbs(t *testing.T) {
-	directory := previewBreadcrumbs("/docs/guide", true)
+	directory := preview.Breadcrumbs("/docs/guide", true)
 	if len(directory) != 3 {
 		t.Fatalf("directory breadcrumb count = %d, want 3", len(directory))
 	}
@@ -89,7 +92,7 @@ func TestPreviewBreadcrumbs(t *testing.T) {
 		t.Fatalf("unexpected current breadcrumb: %+v", directory[2])
 	}
 
-	file := previewBreadcrumbs("/docs/my guide.txt", false)
+	file := preview.Breadcrumbs("/docs/my guide.txt", false)
 	if file[2].URL != "/docs/my%20guide.txt" || !file[2].Current {
 		t.Fatalf("unexpected file breadcrumb: %+v", file[2])
 	}
@@ -135,7 +138,7 @@ func TestReadTextPreviewEnforcesLimit(t *testing.T) {
 		t.Fatalf("write test file: %v", err)
 	}
 
-	content, previewable, err := readTextPreview(filePath, 4)
+	content, previewable, err := preview.ReadTextPreview(filePath, 4)
 	if err != nil {
 		t.Fatalf("read text preview: %v", err)
 	}
@@ -248,6 +251,28 @@ func TestHTMLFileUsesSandboxedPreview(t *testing.T) {
 	}
 	if !strings.Contains(body, "safe preview") || !strings.Contains(body, "alert") {
 		t.Fatalf("expected original HTML in srcdoc, got %q", body)
+	}
+}
+
+func TestXMLFileIsFormatted(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "data.xml")
+	if err := os.WriteFile(filePath, []byte("<root><item>value</item></root>"), 0o600); err != nil {
+		t.Fatalf("write XML file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/data.xml", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	body := response.Body.String()
+	if !strings.Contains(body, "&lt;root&gt;") || !strings.Contains(body, "  &lt;item&gt;value&lt;/item&gt;") {
+		t.Fatalf("expected formatted XML preview, got %q", body)
 	}
 }
 
@@ -377,33 +402,19 @@ func TestTSVFileIsRenderedAsTable(t *testing.T) {
 	}
 }
 
-func TestCSVPreviewIsBounded(t *testing.T) {
-	content := strings.Builder{}
-	for row := 0; row < csvPreviewMaxRows+1; row++ {
-		content.WriteString("a,b,c,d\n")
-	}
+func TestCSVPreviewKeepsAllRowsAndColumns(t *testing.T) {
+	row := strings.Repeat("a,", 50) + "a\n"
+	content := []byte(strings.Repeat(row, 1001))
 
-	rows, truncated, err := parseCSVPreview([]byte(content.String()), ',')
+	rows, err := preview.ParseCSVPreview(content, ',')
 	if err != nil {
 		t.Fatalf("parse CSV preview: %v", err)
 	}
-	if len(rows) != csvPreviewMaxRows {
-		t.Fatalf("row count = %d, want %d", len(rows), csvPreviewMaxRows)
+	if len(rows) != 1001 {
+		t.Fatalf("row count = %d, want %d", len(rows), 1001)
 	}
-	if !truncated {
-		t.Fatal("expected truncated CSV preview")
-	}
-
-	wideRow := strings.TrimSuffix(strings.Repeat("a,", csvPreviewMaxColumns), ",") + ",a\n"
-	rows, truncated, err = parseCSVPreview([]byte(wideRow), ',')
-	if err != nil {
-		t.Fatalf("parse wide CSV preview: %v", err)
-	}
-	if len(rows[0]) != csvPreviewMaxColumns {
-		t.Fatalf("column count = %d, want %d", len(rows[0]), csvPreviewMaxColumns)
-	}
-	if !truncated {
-		t.Fatal("expected truncated wide CSV preview")
+	if len(rows[0]) != 51 {
+		t.Fatalf("column count = %d, want %d", len(rows[0]), 51)
 	}
 }
 
@@ -570,7 +581,7 @@ func TestMarkdownPreviewForBrowserDisablesRawHTML(t *testing.T) {
 }
 
 func TestMarkdownPreviewRendersMermaid(t *testing.T) {
-	rendered, err := renderMarkdown([]byte("```mermaid\ngraph LR\n    A --> B\n```\n"))
+	rendered, err := preview.RenderMarkdown([]byte("```mermaid\ngraph LR\n    A --> B\n```\n"))
 	if err != nil {
 		t.Fatalf("render Mermaid markdown: %v", err)
 	}
@@ -584,7 +595,7 @@ func TestMarkdownPreviewRendersMermaid(t *testing.T) {
 }
 
 func TestMarkdownPreviewRendersExtendedSyntax(t *testing.T) {
-	rendered, err := renderMarkdown([]byte("Term\n: Definition\n\nText[^1]\n\n[^1]: Note\n"))
+	rendered, err := preview.RenderMarkdown([]byte("Term\n: Definition\n\nText[^1]\n\n[^1]: Note\n"))
 	if err != nil {
 		t.Fatalf("render extended Markdown: %v", err)
 	}
@@ -706,6 +717,7 @@ func TestNewHandlerRequiresMarkdownTemplate(t *testing.T) {
 		"assets/image.html":     {Data: []byte("image")},
 		"assets/media.html":     {Data: []byte("media")},
 		"assets/json.html":      {Data: []byte("json")},
+		"assets/xml.html":       {Data: []byte("xml")},
 		"assets/csv.html":       {Data: []byte("csv")},
 		"assets/pdf.html":       {Data: []byte("pdf")},
 		"assets/archive.html":   {Data: []byte("archive")},

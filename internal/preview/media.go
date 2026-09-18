@@ -1,4 +1,4 @@
-package internal
+package preview
 
 import (
 	"html/template"
@@ -6,24 +6,26 @@ import (
 	"os"
 )
 
-type imagePreviewData struct {
+type mediaPreviewData struct {
 	FileName    string
 	RawURL      string
+	MediaKind   PreviewType
 	Size        string
 	Modified    string
-	Breadcrumbs []breadcrumb
+	Breadcrumbs []Breadcrumb
 	LocalPath   string
 	ProjectURL  string
 	Version     string
 }
 
-func renderImagePreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config) error {
-	data := imagePreviewData{
+func RenderMediaPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, mediaKind PreviewType) error {
+	data := mediaPreviewData{
 		FileName:    previewFileName(filePath),
 		RawURL:      previewRawURL(requestPath),
+		MediaKind:   mediaKind,
 		Size:        previewFileSize(info),
 		Modified:    previewModified(info),
-		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		Breadcrumbs: Breadcrumbs(requestPath, false),
 		LocalPath:   previewLocalPath(filePath),
 		ProjectURL:  config.ProjectURL,
 		Version:     config.Version,

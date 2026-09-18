@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/jiacai2050/peekd/internal/middleware"
+	"github.com/jiacai2050/peekd/internal/preview"
 )
 
 type Config struct {
@@ -48,7 +49,7 @@ type directoryEntry struct {
 type directoryData struct {
 	HasParent   bool
 	Entries     []directoryEntry
-	Breadcrumbs []breadcrumb
+	Breadcrumbs []preview.Breadcrumb
 	LocalPath   string
 	ProjectURL  string
 	Version     string
@@ -72,38 +73,40 @@ func detectContentType(filePath string) (string, error) {
 	return http.DetectContentType(buffer[:n]), nil
 }
 
-func previewTypeByExtension(filePath string) previewType {
+func previewTypeByExtension(filePath string) preview.PreviewType {
 	lowerPath := strings.ToLower(filePath)
 	switch {
 	case strings.HasSuffix(lowerPath, ".tar.gz"), strings.HasSuffix(lowerPath, ".tgz"):
-		return previewTypeTARGZ
+		return preview.PreviewTypeTARGZ
 	}
 
 	switch strings.ToLower(filepath.Ext(filePath)) {
 	case ".md", ".markdown":
-		return previewTypeMarkdown
+		return preview.PreviewTypeMarkdown
 	case ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg", ".tif", ".tiff", ".webp":
-		return previewTypeImage
+		return preview.PreviewTypeImage
 	case ".aac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".opus", ".wav", ".weba":
-		return previewTypeAudio
+		return preview.PreviewTypeAudio
 	case ".avi", ".m4v", ".mkv", ".mov", ".mp4", ".ogv", ".webm":
-		return previewTypeVideo
+		return preview.PreviewTypeVideo
 	case ".pdf":
-		return previewTypePDF
+		return preview.PreviewTypePDF
 	case ".zip":
-		return previewTypeZIP
+		return preview.PreviewTypeZIP
 	case ".tar":
-		return previewTypeTAR
+		return preview.PreviewTypeTAR
 	case ".json":
-		return previewTypeJSON
+		return preview.PreviewTypeJSON
+	case ".xml":
+		return preview.PreviewTypeXML
 	case ".html", ".htm":
-		return previewTypeHTML
+		return preview.PreviewTypeHTML
 	case ".csv":
-		return previewTypeCSV
+		return preview.PreviewTypeCSV
 	case ".tsv":
-		return previewTypeTSV
+		return preview.PreviewTypeTSV
 	case ".txt", ".log", ".conf", ".ini", ".properties",
-		".jsonc", ".yaml", ".yml", ".toml", ".xml",
+		".jsonc", ".yaml", ".yml", ".toml",
 		".rst",
 		".css", ".scss", ".sass", ".less",
 		".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
@@ -114,37 +117,37 @@ func previewTypeByExtension(filePath string) previewType {
 		".cs", ".fs", ".fsx",
 		".sh", ".bash", ".zsh", ".fish", ".ps1",
 		".sql":
-		return previewTypeText
+		return preview.PreviewTypeText
 	default:
 		switch strings.ToLower(filepath.Base(filePath)) {
 		case "makefile", "dockerfile", "jenkinsfile", "justfile", "license":
-			return previewTypeText
+			return preview.PreviewTypeText
 		default:
-			return previewTypeNone
+			return preview.PreviewTypeNone
 		}
 	}
 }
 
-func previewTypeByContent(contentType string) previewType {
+func previewTypeByContent(contentType string) preview.PreviewType {
 	switch {
 	case strings.HasPrefix(contentType, "image/"):
-		return previewTypeImage
+		return preview.PreviewTypeImage
 	case strings.HasPrefix(contentType, "audio/"):
-		return previewTypeAudio
+		return preview.PreviewTypeAudio
 	case strings.HasPrefix(contentType, "video/"):
-		return previewTypeVideo
+		return preview.PreviewTypeVideo
 	case contentType == "application/pdf":
-		return previewTypePDF
+		return preview.PreviewTypePDF
 	case contentType == "application/zip":
-		return previewTypeZIP
+		return preview.PreviewTypeZIP
 	case contentType == "application/x-tar":
-		return previewTypeTAR
+		return preview.PreviewTypeTAR
 	case contentType == "application/json":
-		return previewTypeJSON
+		return preview.PreviewTypeJSON
 	case strings.HasPrefix(contentType, "text/"):
-		return previewTypeText
+		return preview.PreviewTypeText
 	default:
-		return previewTypeNone
+		return preview.PreviewTypeNone
 	}
 }
 
@@ -167,15 +170,15 @@ func fileIcon(path string, isDir bool) string {
 	}
 
 	switch previewTypeByExtension(path) {
-	case previewTypeImage:
+	case preview.PreviewTypeImage:
 		return "🖼️"
-	case previewTypeAudio:
+	case preview.PreviewTypeAudio:
 		return "🎵"
-	case previewTypeVideo:
+	case preview.PreviewTypeVideo:
 		return "🎬"
-	case previewTypeText, previewTypeMarkdown, previewTypeCSV, previewTypeTSV:
+	case preview.PreviewTypeText, preview.PreviewTypeMarkdown, preview.PreviewTypeCSV, preview.PreviewTypeTSV:
 		return "📄"
-	case previewTypeHTML:
+	case preview.PreviewTypeHTML:
 		return "🌐"
 	}
 
@@ -185,21 +188,6 @@ func fileIcon(path string, isDir bool) string {
 	default:
 		return "📄"
 	}
-}
-
-func formatFileSize(size int64) string {
-	const unit = 1024
-	if size < unit {
-		return fmt.Sprintf("%d B", size)
-	}
-
-	div, exp := int64(unit), 0
-	for n := size / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-
-	return fmt.Sprintf("%.1f %cB", float64(size)/float64(div), "KMGTPE"[exp])
 }
 
 func ParseByteSize(value string) (int64, error) {
@@ -319,8 +307,8 @@ func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPat
 		HasParent:   requestPath != "/",
 		ProjectURL:  projectURL,
 		Version:     version,
-		Breadcrumbs: previewBreadcrumbs(requestPath, true),
-		LocalPath:   previewLocalPath(fullPath),
+		Breadcrumbs: preview.Breadcrumbs(requestPath, true),
+		LocalPath:   filepath.Clean(fullPath),
 	}
 
 	for _, entry := range entries {
@@ -332,7 +320,7 @@ func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPat
 
 		size := "-"
 		if !entry.IsDir() {
-			size = formatFileSize(info.Size())
+			size = preview.FormatFileSize(info.Size())
 		}
 		data.Entries = append(data.Entries, directoryEntry{
 			Name:         entry.Name(),
@@ -449,6 +437,10 @@ func NewHandler(config Config) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON template: %w", err)
 	}
+	xmlTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/xml.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse XML template: %w", err)
+	}
 	csvTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/csv.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse CSV template: %w", err)
@@ -472,6 +464,10 @@ func NewHandler(config Config) (http.Handler, error) {
 	}
 
 	fileServer := http.FileServer(http.Dir(config.RootDir))
+	previewConfig := preview.Config{
+		ProjectURL: config.ProjectURL,
+		Version:    config.Version,
+	}
 	assetServer := http.StripPrefix("/__peekd_assets/", http.FileServer(http.FS(assetsFS)))
 	mux := http.NewServeMux()
 	mux.Handle("/__peekd_assets/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -509,89 +505,76 @@ func NewHandler(config Config) (http.Handler, error) {
 			return
 		}
 
-		preview := previewTypeByExtension(fullPath)
-		if preview == previewTypeNone {
+		previewKind := previewTypeByExtension(fullPath)
+		if previewKind == preview.PreviewTypeNone {
 			contentType, detectErr := detectContentType(fullPath)
 			if detectErr != nil {
 				http.Error(w, "unable to inspect file", http.StatusInternalServerError)
 				return
 			}
-			preview = previewTypeByContent(contentType)
+			previewKind = previewTypeByContent(contentType)
 		}
 
-		var content []byte
-		var formattedJSON string
-		if preview == previewTypeHTML || preview == previewTypeCSV || preview == previewTypeTSV || preview == previewTypeJSON || preview == previewTypeText || preview == previewTypeMarkdown {
-			var previewable bool
-			content, previewable, err = readPreviewContent(fullPath, info.Size(), config.MaxTextPreviewSize)
-			if err != nil {
-				http.Error(w, "unable to read file", http.StatusInternalServerError)
-				return
-			}
-			if !previewable {
-				fileServer.ServeHTTP(w, r)
-				return
-			}
-
-			if preview == previewTypeJSON {
-				formattedJSON, err = formatJSON(content)
-				if err != nil {
-					preview = previewTypeText
-				}
-			}
+		prepared, preparedPreviewType, prepareErr := preview.PrepareTextPreview(previewKind, fullPath, info.Size(), config.MaxTextPreviewSize)
+		if prepareErr != nil {
+			http.Error(w, "unable to read file", http.StatusInternalServerError)
+			return
 		}
+		if preparedPreviewType == preview.PreviewTypeNone {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		previewKind = preparedPreviewType
 
-		switch preview {
-		case previewTypeHTML:
-			if err := renderHTMLPreview(w, htmlTemplate, r.URL.Path, fullPath, info, config, content); err != nil {
-				log.Printf("failed to render HTML preview %s: %v", r.URL.Path, err)
-			}
-
-		case previewTypeImage:
-			if err := renderImagePreview(w, imageTemplate, r.URL.Path, fullPath, info, config); err != nil {
+		switch previewKind {
+		case preview.PreviewTypeImage:
+			if err := preview.RenderImagePreview(w, imageTemplate, r.URL.Path, fullPath, info, previewConfig); err != nil {
 				log.Printf("failed to render image preview %s: %v", r.URL.Path, err)
 			}
 
-		case previewTypeAudio, previewTypeVideo:
-			if err := renderMediaPreview(w, mediaTemplate, r.URL.Path, fullPath, info, config, preview); err != nil {
+		case preview.PreviewTypeAudio, preview.PreviewTypeVideo:
+			if err := preview.RenderMediaPreview(w, mediaTemplate, r.URL.Path, fullPath, info, previewConfig, previewKind); err != nil {
 				log.Printf("failed to render media preview %s: %v", r.URL.Path, err)
 			}
 
-		case previewTypePDF:
-			if err := renderPDFPreview(w, pdfTemplate, r.URL.Path, fullPath, info, config); err != nil {
+		case preview.PreviewTypePDF:
+			if err := preview.RenderPDFPreview(w, pdfTemplate, r.URL.Path, fullPath, info, previewConfig); err != nil {
 				log.Printf("failed to render PDF preview %s: %v", r.URL.Path, err)
 			}
 
-		case previewTypeZIP, previewTypeTAR, previewTypeTARGZ:
-			if err := renderArchivePreview(w, archiveTemplate, r.URL.Path, fullPath, info, config); err != nil {
+		case preview.PreviewTypeZIP, preview.PreviewTypeTAR, preview.PreviewTypeTARGZ:
+			if err := preview.RenderArchivePreview(w, archiveTemplate, r.URL.Path, fullPath, info, previewConfig); err != nil {
 				fileServer.ServeHTTP(w, r)
 			}
 
-		case previewTypeJSON:
-			if err := renderJSONPreview(w, jsonTemplate, r.URL.Path, fullPath, info, config, formattedJSON); err != nil {
+		case preview.PreviewTypeHTML:
+			if err := preview.RenderHTMLPreview(w, htmlTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Formatted); err != nil {
+				log.Printf("failed to render HTML preview %s: %v", r.URL.Path, err)
+			}
+
+		case preview.PreviewTypeJSON:
+			if err := preview.RenderJSONPreview(w, jsonTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Formatted); err != nil {
 				log.Printf("failed to render JSON preview %s: %v", r.URL.Path, err)
 			}
 
-		case previewTypeCSV, previewTypeTSV:
-			delimiter := ','
-			if preview == previewTypeTSV {
-				delimiter = '\t'
-			}
-			if err := renderCSVPreview(w, csvTemplate, r.URL.Path, fullPath, info, config, content, delimiter); err != nil {
-				preview = previewTypeText
-				if err := renderTextPreview(w, textTemplate, r.URL.Path, fullPath, info, config, content); err != nil {
-					log.Printf("failed to render delimited text preview %s: %v", r.URL.Path, err)
-				}
+		case preview.PreviewTypeXML:
+			if err := preview.RenderXMLPreview(w, xmlTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Formatted); err != nil {
+				log.Printf("failed to render XML preview %s: %v", r.URL.Path, err)
 			}
 
-		case previewTypeMarkdown:
-			if err := renderMarkdownPreview(w, markdownTemplate, r.URL.Path, fullPath, info, config, content); err != nil {
+		case preview.PreviewTypeMarkdown:
+			if err := preview.RenderMarkdownPreview(w, markdownTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Formatted); err != nil {
 				log.Printf("failed to render markdown preview %s: %v", r.URL.Path, err)
 			}
 
-		case previewTypeText:
-			if err := renderTextPreview(w, textTemplate, r.URL.Path, fullPath, info, config, content); err != nil {
+		case preview.PreviewTypeText:
+			if err := preview.RenderTextPreview(w, textTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Formatted); err != nil {
 				log.Printf("failed to render text preview %s: %v", r.URL.Path, err)
+			}
+
+		case preview.PreviewTypeCSV, preview.PreviewTypeTSV:
+			if err := preview.RenderCSVPreview(w, csvTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Rows); err != nil {
+				log.Printf("failed to render delimited preview %s: %v", r.URL.Path, err)
 			}
 
 		default:

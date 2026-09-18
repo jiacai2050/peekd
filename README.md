@@ -9,7 +9,7 @@ files.
 
 ## Highlights
 
-- Rich previews for Markdown (including Mermaid diagrams), HTML, code, text, CSV, TSV, images, audio, video, PDF, and
+- Rich previews for Markdown (including Mermaid diagrams), HTML, XML, code, text, CSV, TSV, images, audio, video, PDF, and
   standard-library archive listings (ZIP, TAR, and TAR.GZ).
 - Fast direct file serving with HTTP range and [`sendfile`](docs/sendfile.md) support
 - Lightweight single binary with automatic dark mode

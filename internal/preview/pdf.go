@@ -1,4 +1,4 @@
-package internal
+package preview
 
 import (
 	"html/template"
@@ -11,19 +11,19 @@ type pdfPreviewData struct {
 	RawURL      string
 	Size        string
 	Modified    string
-	Breadcrumbs []breadcrumb
+	Breadcrumbs []Breadcrumb
 	LocalPath   string
 	ProjectURL  string
 	Version     string
 }
 
-func renderPDFPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config) error {
+func RenderPDFPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config) error {
 	data := pdfPreviewData{
 		FileName:    previewFileName(filePath),
 		RawURL:      previewRawURL(requestPath),
 		Size:        previewFileSize(info),
 		Modified:    previewModified(info),
-		Breadcrumbs: previewBreadcrumbs(requestPath, false),
+		Breadcrumbs: Breadcrumbs(requestPath, false),
 		LocalPath:   previewLocalPath(filePath),
 		ProjectURL:  config.ProjectURL,
 		Version:     config.Version,
