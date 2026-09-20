@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Peekd</title>
-    <link rel="stylesheet" href="/__peekd_assets/directory.css">
+    <link rel="stylesheet" href="/__peekd_assets/preview.css">
 </head>
 <body>
     <main class="directory">
@@ -40,17 +40,4 @@
             <div class="empty">This directory is empty.</div>
             {{end}}
         </section>
-        <footer class="site-footer">
-            <div>
-                <strong>Peekd</strong>
-                <small>Fast web file server with rich previews.</small>
-            </div>
-            <div class="footer-meta">
-                <small>{{.Version}}</small>
-                <a href="{{.ProjectURL}}" target="_blank" rel="noreferrer">GitHub</a>
-            </div>
-        </footer>
-    </main>
-    <script src="/__peekd_assets/copy.js"></script>
-</body>
-</html>
+{{template "preview-footer" .}}

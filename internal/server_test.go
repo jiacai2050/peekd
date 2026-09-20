@@ -21,19 +21,19 @@ import (
 )
 
 var testEmbeddedFiles = fstest.MapFS{
-	"assets/text.html":      {Data: []byte("<!doctype html><body>{{range .Lines}}{{.}}\n{{end}}</body>")},
-	"assets/html.html":      {Data: []byte("<!doctype html><body>html {{.FileName}}<iframe sandbox srcdoc=\"{{.Content}}\"></iframe></body>")},
-	"assets/directory.html": {Data: []byte("<!doctype html><body><a href=\"/\">Peekd</a>{{if .HasParent}}<a href=\"../\">Parent directory</a>{{end}}{{range .Entries}}<div class=\"entry\">{{.Name}}|{{.URL}}|{{.FileModeBits}}|{{.Modified}}</div>{{end}}</body>")},
-	"assets/image.html":     {Data: []byte("<!doctype html><body>image {{.FileName}}</body>")},
-	"assets/media.html":     {Data: []byte("<!doctype html><body>media {{.FileName}}</body>")},
-	"assets/json.html":      {Data: []byte("<!doctype html><body>json {{.FileName}}<pre>{{.Content}}</pre></body>")},
-	"assets/xml.html":       {Data: []byte("<!doctype html><body>xml {{.FileName}}<pre>{{.Content}}</pre></body>")},
-	"assets/csv.html":       {Data: []byte("<!doctype html><body>csv {{.FileName}} {{range $row := .Rows}}{{range $row}}{{.}}|{{end}}{{end}}</body>")},
-	"assets/pdf.html":       {Data: []byte("<!doctype html><body>pdf {{.FileName}} {{.RawURL}}</body>")},
-	"assets/archive.html":   {Data: []byte("<!doctype html><body>archive {{.FileName}} {{range .Entries}}{{.Name}}|{{.Size}}{{end}}</body>")},
-	"assets/markdown.html":  {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
-	"assets/preview.css":    {Data: []byte("body{}")},
-	"assets/directory.css":  {Data: []byte("body{}")},
+	"assets/preview-common.html": {Data: []byte(`{{define "preview-header"}}<head><title>{{.FileName}}</title></head>{{end}}{{define "preview-footer"}}<footer>{{.Version}} {{.ProjectURL}}</footer>{{end}}`)},
+	"assets/text.html":           {Data: []byte("<!doctype html><body>{{range .Lines}}{{.}}\n{{end}}</body>")},
+	"assets/html.html":           {Data: []byte("<!doctype html><body>html {{.FileName}}<iframe sandbox srcdoc=\"{{.Content}}\"></iframe></body>")},
+	"assets/directory.html":      {Data: []byte("<!doctype html><body><a href=\"/\">Peekd</a>{{if .HasParent}}<a href=\"../\">Parent directory</a>{{end}}{{range .Entries}}<div class=\"entry\">{{.Name}}|{{.URL}}|{{.FileModeBits}}|{{.Modified}}</div>{{end}}</body>")},
+	"assets/image.html":          {Data: []byte("<!doctype html><body>image {{.FileName}}</body>")},
+	"assets/media.html":          {Data: []byte("<!doctype html><body>media {{.FileName}}</body>")},
+	"assets/json.html":           {Data: []byte("<!doctype html><body>json {{.FileName}}<pre>{{.Content}}</pre></body>")},
+	"assets/xml.html":            {Data: []byte("<!doctype html><body>xml {{.FileName}}<pre>{{.Content}}</pre></body>")},
+	"assets/csv.html":            {Data: []byte("<!doctype html><body>csv {{.FileName}} {{range $row := .Rows}}{{range $row}}{{.}}|{{end}}{{end}}</body>")},
+	"assets/pdf.html":            {Data: []byte("<!doctype html><body>pdf {{.FileName}} {{.RawURL}}</body>")},
+	"assets/archive.html":        {Data: []byte("<!doctype html><body>archive {{.FileName}} {{range .Entries}}{{.Name}}|{{.Size}}{{end}}</body>")},
+	"assets/markdown.html":       {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
+	"assets/preview.css":         {Data: []byte("body{}")},
 }
 
 func mustNewHandler(t *testing.T, rootDir string, maxPreviewSize int64) http.Handler {
@@ -711,16 +711,17 @@ func TestAssetRouteServesEmbeddedFiles(t *testing.T) {
 
 func TestNewHandlerRequiresMarkdownTemplate(t *testing.T) {
 	missingMarkdownTemplate := fstest.MapFS{
-		"assets/text.html":      {Data: []byte("text")},
-		"assets/html.html":      {Data: []byte("html")},
-		"assets/directory.html": {Data: []byte("directory")},
-		"assets/image.html":     {Data: []byte("image")},
-		"assets/media.html":     {Data: []byte("media")},
-		"assets/json.html":      {Data: []byte("json")},
-		"assets/xml.html":       {Data: []byte("xml")},
-		"assets/csv.html":       {Data: []byte("csv")},
-		"assets/pdf.html":       {Data: []byte("pdf")},
-		"assets/archive.html":   {Data: []byte("archive")},
+		"assets/preview-common.html": {Data: []byte("common")},
+		"assets/text.html":           {Data: []byte("text")},
+		"assets/html.html":           {Data: []byte("html")},
+		"assets/directory.html":      {Data: []byte("directory")},
+		"assets/image.html":          {Data: []byte("image")},
+		"assets/media.html":          {Data: []byte("media")},
+		"assets/json.html":           {Data: []byte("json")},
+		"assets/xml.html":            {Data: []byte("xml")},
+		"assets/csv.html":            {Data: []byte("csv")},
+		"assets/pdf.html":            {Data: []byte("pdf")},
+		"assets/archive.html":        {Data: []byte("archive")},
 	}
 
 	_, err := NewHandler(Config{

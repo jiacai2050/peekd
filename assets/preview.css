@@ -1,4 +1,24 @@
-/* Standalone preview stylesheet */
+/*
+ * Shared stylesheet for all preview pages and the directory listing.
+ *
+ * Sections (by page):
+ *   - Base layout ........... body, .preview-container
+ *   - Breadcrumbs ........... all pages
+ *   - File header ........... preview pages
+ *   - PDF / HTML iframe ..... pdf, html
+ *   - Code / text ........... text, json, xml
+ *   - Archive list .......... archive
+ *   - CSV table ............. csv
+ *   - Markdown content ...... markdown
+ *   - Image / media ......... image, media
+ *   - Directory listing ..... directory
+ *   - Footer ................ all pages
+ *   - Responsive ............ all pages
+ *   - Dark mode ............. all pages
+ */
+
+/* === Base layout ========================================================= */
+
 body {
     background-color: #f4f6f9;
     font-family: "SF Mono", Monaco, "Andale Mono", monospace;
@@ -16,12 +36,7 @@ body {
     overflow: hidden;
 }
 
-.html-preview {
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    min-height: calc(100vh - 60px);
-}
+/* === Breadcrumbs ========================================================= */
 
 .breadcrumbs {
     align-items: center;
@@ -101,15 +116,17 @@ body {
     gap: 8px;
 }
 
+/* === PDF / HTML iframe =================================================== */
+
 .html-frame {
     background: #ffffff;
     border: 0;
     display: block;
-    flex: 1;
-    height: auto;
-    min-height: 500px;
+    min-height: calc(100vh - 200px);
     width: 100%;
 }
+
+/* === Code / text ========================================================= */
 
 pre {
     margin: 0;
@@ -137,6 +154,8 @@ pre {
     padding: 24px;
     white-space: pre;
 }
+
+/* === Archive list ======================================================== */
 
 .archive-list {
     overflow-x: auto;
@@ -196,6 +215,8 @@ pre {
     font-weight: 600;
 }
 
+/* === CSV table =========================================================== */
+
 .csv-list {
     max-width: 100%;
     overflow-x: auto;
@@ -222,11 +243,7 @@ pre {
     font-weight: 600;
 }
 
-.preview-notice {
-    color: #6b7280;
-    font-size: 13px;
-    padding: 0 24px;
-}
+/* === Code line numbers (text) ============================================ */
 
 .code {
     counter-reset: line;
@@ -261,6 +278,8 @@ pre {
 .line-content {
     display: inline;
 }
+
+/* === Markdown content ==================================================== */
 
 .markdown-content {
     color: #111827;
@@ -333,9 +352,7 @@ pre {
     max-width: min(600px, 70vw);
 }
 
-.image-preview {
-    background: #ffffff;
-}
+/* === Image / PDF preview ================================================= */
 
 .image-frame {
 	align-items: center;
@@ -361,6 +378,8 @@ pre {
     object-fit: contain;
 }
 
+/* === Media preview (audio / video) ======================================= */
+
 .media-frame {
     align-items: center;
     background: #f8fafc;
@@ -379,6 +398,119 @@ pre {
     max-width: 100%;
 }
 
+/* === Directory listing =================================================== */
+
+.directory {
+    max-width: 1080px;
+    margin: 0 auto;
+}
+
+.directory-header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 20px;
+}
+
+.directory-header .breadcrumbs {
+    margin-bottom: 0;
+}
+
+.directory-actions {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+}
+
+.entry-count {
+    color: #64748b;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.file-list {
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.file-row {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) 110px 100px 150px;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 20px;
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px solid #eef2f7;
+    transition: background 120ms ease;
+}
+
+.file-row:last-child {
+    border-bottom: 0;
+}
+
+.file-row:hover {
+    background: #f8fafc;
+}
+
+.file-icon {
+    color: #64748b;
+    font-size: 18px;
+    text-align: center;
+}
+
+.directory-row .file-icon,
+.directory-row .file-name {
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.directory .file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.directory .file-mode,
+.directory .file-meta,
+.directory .file-date {
+    color: #64748b;
+    font-size: 13px;
+    text-align: right;
+}
+
+.directory .copy-button {
+    background: transparent;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    color: #475569;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 10px;
+}
+
+.directory .copy-button:hover {
+    background: #e2e8f0;
+}
+
+.directory .site-footer {
+    border-top: 0;
+    padding: 18px 20px 0;
+}
+
+.empty {
+    padding: 48px 20px;
+    color: #64748b;
+    text-align: center;
+}
+
+/* === Footer (all pages) ================================================== */
+
 .site-footer {
     align-items: center;
     border-top: 1px solid #e5e7eb;
@@ -395,14 +527,12 @@ pre {
     margin-top: 4px;
 }
 
-.site-footer a,
-.footer-meta a {
+.site-footer a {
     color: #2563eb;
     text-decoration: none;
 }
 
-.site-footer a:hover,
-.footer-meta a:hover {
+.site-footer a:hover {
     text-decoration: underline;
 }
 
@@ -410,7 +540,9 @@ pre {
     text-align: right;
 }
 
-@media (max-width: 600px) {
+/* === Responsive ========================================================== */
+
+@media (max-width: 700px) {
     .site-footer {
         align-items: flex-start;
         flex-direction: column;
@@ -420,7 +552,24 @@ pre {
     .footer-meta {
         text-align: left;
     }
+
+    .directory-header {
+        align-items: start;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .file-row {
+        grid-template-columns: 28px minmax(0, 1fr) auto auto;
+        padding: 14px;
+    }
+
+    .file-date {
+        display: none;
+    }
 }
+
+/* === Dark mode =========================================================== */
 
 @media (prefers-color-scheme: dark) {
     body {
@@ -486,11 +635,6 @@ pre {
         border-color: #4b5563;
     }
 
-    .preview-notice {
-        color: #9ca3af;
-    }
-
-    .image-preview,
     .image-frame,
     .media-frame {
         background: #1f2937;
@@ -501,8 +645,16 @@ pre {
         color: #9ca3af;
     }
 
-    .site-footer a,
-    .footer-meta a {
+    .site-footer a {
         color: #93c5fd;
+    }
+
+    .copy-button {
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    .copy-button:hover {
+        background: #1e293b;
     }
 }

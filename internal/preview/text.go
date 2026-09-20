@@ -10,15 +10,8 @@ import (
 )
 
 type textPreviewData struct {
-	FileName    string
-	Lines       []string
-	RawURL      string
-	Size        string
-	Modified    string
-	Breadcrumbs []Breadcrumb
-	LocalPath   string
-	ProjectURL  string
-	Version     string
+	PreviewCommon
+	Lines []string
 }
 
 type PreparedTextPreview struct {
@@ -107,17 +100,8 @@ func splitLines(content string) []string {
 }
 
 func RenderTextPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content string) error {
-	data := textPreviewData{
-		FileName:    previewFileName(filePath),
-		Lines:       splitLines(content),
-		RawURL:      previewRawURL(requestPath),
-		Size:        previewFileSize(info),
-		Modified:    previewModified(info),
-		Breadcrumbs: Breadcrumbs(requestPath, false),
-		LocalPath:   previewLocalPath(filePath),
-		ProjectURL:  config.ProjectURL,
-		Version:     config.Version,
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	return tmpl.Execute(w, data)
+	return executeTemplate(w, tmpl, textPreviewData{
+		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, "📄", ""),
+		Lines:         splitLines(content),
+	})
 }

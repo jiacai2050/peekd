@@ -13,15 +13,8 @@ import (
 )
 
 type markdownPreviewData struct {
-	FileName    string
-	HTML        template.HTML
-	RawURL      string
-	Size        string
-	Modified    string
-	Breadcrumbs []Breadcrumb
-	LocalPath   string
-	ProjectURL  string
-	Version     string
+	PreviewCommon
+	HTML template.HTML
 }
 
 var markdownParser = parser.New(
@@ -54,17 +47,8 @@ func RenderMarkdown(content []byte) (string, error) {
 }
 
 func RenderMarkdownPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, markdownHTML string) error {
-	data := markdownPreviewData{
-		FileName:    previewFileName(filePath),
-		HTML:        template.HTML(markdownHTML),
-		RawURL:      previewRawURL(requestPath),
-		Size:        previewFileSize(info),
-		Modified:    previewModified(info),
-		Breadcrumbs: Breadcrumbs(requestPath, false),
-		LocalPath:   previewLocalPath(filePath),
-		ProjectURL:  config.ProjectURL,
-		Version:     config.Version,
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	return tmpl.Execute(w, data)
+	return executeTemplate(w, tmpl, markdownPreviewData{
+		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, "📝", ""),
+		HTML:          template.HTML(markdownHTML),
+	})
 }

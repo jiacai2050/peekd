@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"time"
 
 	"github.com/jiacai2050/peekd/internal"
 )
@@ -15,7 +16,7 @@ import (
 //go:embed assets/*
 var embeddedFiles embed.FS
 
-var Version = "dev"
+var Version = "dev-" + time.Now().Format("20060102-150405")
 
 const ProjectURL = "https://github.com/jiacai2050/peekd"
 

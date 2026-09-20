@@ -2,6 +2,8 @@ package preview
 
 import (
 	"fmt"
+	"html/template"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -18,6 +20,40 @@ type Breadcrumb struct {
 type Config struct {
 	ProjectURL string
 	Version    string
+}
+
+// PreviewCommon holds fields shared by every preview data struct.
+type PreviewCommon struct {
+	FileName    string
+	Icon        string
+	ExtraMeta   string
+	Size        string
+	Modified    string
+	RawURL      string
+	Breadcrumbs []Breadcrumb
+	LocalPath   string
+	ProjectURL  string
+	Version     string
+}
+
+func newPreviewCommon(requestPath, filePath string, info os.FileInfo, config Config, icon, extraMeta string) PreviewCommon {
+	return PreviewCommon{
+		FileName:    previewFileName(filePath),
+		Icon:        icon,
+		ExtraMeta:   extraMeta,
+		Size:        previewFileSize(info),
+		Modified:    previewModified(info),
+		RawURL:      previewRawURL(requestPath),
+		Breadcrumbs: Breadcrumbs(requestPath, false),
+		LocalPath:   previewLocalPath(filePath),
+		ProjectURL:  config.ProjectURL,
+		Version:     config.Version,
+	}
+}
+
+func executeTemplate(w http.ResponseWriter, tmpl *template.Template, data any) error {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	return tmpl.Execute(w, data)
 }
 
 func Breadcrumbs(requestPath string, isDir bool) []Breadcrumb {

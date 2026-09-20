@@ -413,47 +413,47 @@ func listenWithFallback(addr string) (net.Listener, error) {
 }
 
 func NewHandler(config Config) (http.Handler, error) {
-	textTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/text.html")
+	textTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/text.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse embedded template: %w", err)
 	}
-	htmlTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/html.html")
+	htmlTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/html.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse HTML template: %w", err)
 	}
-	directoryTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/directory.html")
+	directoryTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/directory.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse directory template: %w", err)
 	}
-	imageTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/image.html")
+	imageTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/image.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse image template: %w", err)
 	}
-	mediaTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/media.html")
+	mediaTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/media.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse media template: %w", err)
 	}
-	jsonTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/json.html")
+	jsonTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/json.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON template: %w", err)
 	}
-	xmlTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/xml.html")
+	xmlTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/xml.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse XML template: %w", err)
 	}
-	csvTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/csv.html")
+	csvTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/csv.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse CSV template: %w", err)
 	}
-	pdfTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/pdf.html")
+	pdfTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/pdf.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse PDF template: %w", err)
 	}
-	archiveTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/archive.html")
+	archiveTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/archive.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse archive template: %w", err)
 	}
-	markdownTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/markdown.html")
+	markdownTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/markdown.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse markdown template: %w", err)
 	}
