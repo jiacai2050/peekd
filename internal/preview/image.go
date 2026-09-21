@@ -12,6 +12,6 @@ type imagePreviewData struct {
 
 func RenderImagePreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config) error {
 	return executeTemplate(w, tmpl, imagePreviewData{
-		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, "🖼️", ""),
+		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, ""),
 	})
 }

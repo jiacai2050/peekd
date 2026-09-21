@@ -11,6 +11,64 @@ import (
 	"strings"
 )
 
+// PreviewTypeByExtension returns the preview type for a file path based on its extension.
+func PreviewTypeByExtension(filePath string) PreviewType {
+	lowerPath := strings.ToLower(filePath)
+	switch {
+	case strings.HasSuffix(lowerPath, ".tar.gz"), strings.HasSuffix(lowerPath, ".tgz"):
+		return PreviewTypeTARGZ
+	}
+
+	switch strings.ToLower(filepath.Ext(filePath)) {
+	case ".md", ".markdown":
+		return PreviewTypeMarkdown
+	case ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg", ".tif", ".tiff", ".webp":
+		return PreviewTypeImage
+	case ".aac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".opus", ".wav", ".weba":
+		return PreviewTypeAudio
+	case ".avi", ".m4v", ".mkv", ".mov", ".mp4", ".ogv", ".webm":
+		return PreviewTypeVideo
+	case ".pdf":
+		return PreviewTypePDF
+	case ".zip":
+		return PreviewTypeZIP
+	case ".tar":
+		return PreviewTypeTAR
+	case ".json":
+		return PreviewTypeJSON
+	case ".xml":
+		return PreviewTypeXML
+	case ".html", ".htm":
+		return PreviewTypeHTML
+	case ".csv":
+		return PreviewTypeCSV
+	case ".tsv":
+		return PreviewTypeTSV
+	case ".mobi":
+		return PreviewTypeMOBI
+	case ".txt", ".log", ".conf", ".ini", ".properties",
+		".jsonc", ".yaml", ".yml", ".toml",
+		".rst",
+		".css", ".scss", ".sass", ".less",
+		".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
+		".vue", ".svelte",
+		".go", ".rs", ".zig", ".py", ".rb", ".php",
+		".java", ".kt", ".kts", ".swift",
+		".c", ".h", ".cc", ".cpp", ".cxx", ".hpp",
+		".cs", ".fs", ".fsx",
+		".sh", ".bash", ".zsh", ".fish", ".ps1",
+		".sql":
+		return PreviewTypeText
+	default:
+		switch strings.ToLower(filepath.Base(filePath)) {
+		case "makefile", "dockerfile", "jenkinsfile", "justfile", "license":
+			return PreviewTypeText
+		default:
+			return PreviewTypeNone
+		}
+	}
+}
+
 type Breadcrumb struct {
 	Name    string
 	URL     string
@@ -36,10 +94,41 @@ type PreviewCommon struct {
 	Version     string
 }
 
-func newPreviewCommon(requestPath, filePath string, info os.FileInfo, config Config, icon, extraMeta string) PreviewCommon {
+func FileIcon(path string, isDir bool) string {
+	if isDir {
+		return "📁"
+	}
+
+	switch PreviewTypeByExtension(path) {
+	case PreviewTypeImage:
+		return "🖼️"
+	case PreviewTypeAudio:
+		return "🎵"
+	case PreviewTypeVideo:
+		return "🎬"
+	case PreviewTypeText, PreviewTypeMarkdown, PreviewTypeCSV, PreviewTypeTSV:
+		return "📄"
+	case PreviewTypeHTML:
+		return "🌐"
+	case PreviewTypeMOBI:
+		return "📚"
+	case PreviewTypeJSON:
+		return "🧾"
+	case PreviewTypeXML:
+		return "🧾"
+	case PreviewTypePDF:
+		return "📚"
+	case PreviewTypeZIP, PreviewTypeTAR, PreviewTypeTARGZ:
+		return "📦"
+	default:
+		return "📄"
+	}
+}
+
+func newPreviewCommon(requestPath, filePath string, info os.FileInfo, config Config, extraMeta string) PreviewCommon {
 	return PreviewCommon{
 		FileName:    previewFileName(filePath),
-		Icon:        icon,
+		Icon:        FileIcon(filePath, info.IsDir()),
 		ExtraMeta:   extraMeta,
 		Size:        previewFileSize(info),
 		Modified:    previewModified(info),
@@ -98,6 +187,7 @@ const (
 	PreviewTypeZIP      PreviewType = "zip"
 	PreviewTypeTAR      PreviewType = "tar"
 	PreviewTypeTARGZ    PreviewType = "tar-gz"
+	PreviewTypeMOBI     PreviewType = "mobi"
 )
 
 func previewRawURL(requestPath string) string {

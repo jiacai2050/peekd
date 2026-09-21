@@ -23,7 +23,7 @@ func formatJSON(content []byte) (string, error) {
 
 func RenderJSONPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content string) error {
 	return executeTemplate(w, tmpl, jsonPreviewData{
-		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, "🧾", ""),
+		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, ""),
 		Content:       content,
 	})
 }

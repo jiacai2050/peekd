@@ -101,7 +101,7 @@ func splitLines(content string) []string {
 
 func RenderTextPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content string) error {
 	return executeTemplate(w, tmpl, textPreviewData{
-		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, "📄", ""),
+		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, ""),
 		Lines:         splitLines(content),
 	})
 }

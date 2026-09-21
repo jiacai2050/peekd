@@ -35,7 +35,7 @@ func ParseCSVPreview(content []byte, delimiter rune) ([][]string, error) {
 
 func RenderCSVPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, rows [][]string) error {
 	return executeTemplate(w, tmpl, csvPreviewData{
-		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, "📊", fmt.Sprintf("%d rows", len(rows))),
+		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, fmt.Sprintf("%d rows", len(rows))),
 		Rows:          rows,
 	})
 }

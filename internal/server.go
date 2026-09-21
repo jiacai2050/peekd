@@ -73,61 +73,6 @@ func detectContentType(filePath string) (string, error) {
 	return http.DetectContentType(buffer[:n]), nil
 }
 
-func previewTypeByExtension(filePath string) preview.PreviewType {
-	lowerPath := strings.ToLower(filePath)
-	switch {
-	case strings.HasSuffix(lowerPath, ".tar.gz"), strings.HasSuffix(lowerPath, ".tgz"):
-		return preview.PreviewTypeTARGZ
-	}
-
-	switch strings.ToLower(filepath.Ext(filePath)) {
-	case ".md", ".markdown":
-		return preview.PreviewTypeMarkdown
-	case ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg", ".tif", ".tiff", ".webp":
-		return preview.PreviewTypeImage
-	case ".aac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".opus", ".wav", ".weba":
-		return preview.PreviewTypeAudio
-	case ".avi", ".m4v", ".mkv", ".mov", ".mp4", ".ogv", ".webm":
-		return preview.PreviewTypeVideo
-	case ".pdf":
-		return preview.PreviewTypePDF
-	case ".zip":
-		return preview.PreviewTypeZIP
-	case ".tar":
-		return preview.PreviewTypeTAR
-	case ".json":
-		return preview.PreviewTypeJSON
-	case ".xml":
-		return preview.PreviewTypeXML
-	case ".html", ".htm":
-		return preview.PreviewTypeHTML
-	case ".csv":
-		return preview.PreviewTypeCSV
-	case ".tsv":
-		return preview.PreviewTypeTSV
-	case ".txt", ".log", ".conf", ".ini", ".properties",
-		".jsonc", ".yaml", ".yml", ".toml",
-		".rst",
-		".css", ".scss", ".sass", ".less",
-		".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
-		".vue", ".svelte",
-		".go", ".rs", ".zig", ".py", ".rb", ".php",
-		".java", ".kt", ".kts", ".swift",
-		".c", ".h", ".cc", ".cpp", ".cxx", ".hpp",
-		".cs", ".fs", ".fsx",
-		".sh", ".bash", ".zsh", ".fish", ".ps1",
-		".sql":
-		return preview.PreviewTypeText
-	default:
-		switch strings.ToLower(filepath.Base(filePath)) {
-		case "makefile", "dockerfile", "jenkinsfile", "justfile", "license":
-			return preview.PreviewTypeText
-		default:
-			return preview.PreviewTypeNone
-		}
-	}
-}
-
 func previewTypeByContent(contentType string) preview.PreviewType {
 	switch {
 	case strings.HasPrefix(contentType, "image/"):
@@ -162,32 +107,6 @@ func isDocumentRequest(r *http.Request) bool {
 		return r.Header.Get("Upgrade-Insecure-Requests") == "1"
 	}
 	return false
-}
-
-func fileIcon(path string, isDir bool) string {
-	if isDir {
-		return "📁"
-	}
-
-	switch previewTypeByExtension(path) {
-	case preview.PreviewTypeImage:
-		return "🖼️"
-	case preview.PreviewTypeAudio:
-		return "🎵"
-	case preview.PreviewTypeVideo:
-		return "🎬"
-	case preview.PreviewTypeText, preview.PreviewTypeMarkdown, preview.PreviewTypeCSV, preview.PreviewTypeTSV:
-		return "📄"
-	case preview.PreviewTypeHTML:
-		return "🌐"
-	}
-
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".7z", ".bz2", ".gz", ".rar", ".tar", ".tgz", ".xz", ".zip":
-		return "📦"
-	default:
-		return "📄"
-	}
 }
 
 func ParseByteSize(value string) (int64, error) {
@@ -325,7 +244,7 @@ func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPat
 		data.Entries = append(data.Entries, directoryEntry{
 			Name:         entry.Name(),
 			URL:          directoryEntryURL(requestPath, entry.Name(), entry.IsDir()),
-			Icon:         fileIcon(entry.Name(), entry.IsDir()),
+			Icon:         preview.FileIcon(entry.Name(), entry.IsDir()),
 			FileModeBits: info.Mode().String(),
 			Size:         size,
 			Modified:     info.ModTime().Format("2006-01-02 15:04:05"),
@@ -457,6 +376,10 @@ func NewHandler(config Config) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse markdown template: %w", err)
 	}
+	mobiTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/mobi.html", "assets/preview-common.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse MOBI template: %w", err)
+	}
 
 	assetsFS, err := fs.Sub(config.EmbeddedFiles, "assets")
 	if err != nil {
@@ -505,7 +428,7 @@ func NewHandler(config Config) (http.Handler, error) {
 			return
 		}
 
-		previewKind := previewTypeByExtension(fullPath)
+		previewKind := preview.PreviewTypeByExtension(fullPath)
 		if previewKind == preview.PreviewTypeNone {
 			contentType, detectErr := detectContentType(fullPath)
 			if detectErr != nil {
@@ -575,6 +498,11 @@ func NewHandler(config Config) (http.Handler, error) {
 		case preview.PreviewTypeCSV, preview.PreviewTypeTSV:
 			if err := preview.RenderCSVPreview(w, csvTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Rows); err != nil {
 				log.Printf("failed to render delimited preview %s: %v", r.URL.Path, err)
+			}
+
+		case preview.PreviewTypeMOBI:
+			if err := preview.RenderMOBIPreview(w, mobiTemplate, r.URL.Path, fullPath, info, previewConfig); err != nil {
+				log.Printf("failed to render MOBI preview %s: %v", r.URL.Path, err)
 			}
 
 		default:

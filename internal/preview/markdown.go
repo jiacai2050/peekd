@@ -48,7 +48,7 @@ func RenderMarkdown(content []byte) (string, error) {
 
 func RenderMarkdownPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, markdownHTML string) error {
 	return executeTemplate(w, tmpl, markdownPreviewData{
-		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, "📝", ""),
+		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, ""),
 		HTML:          template.HTML(markdownHTML),
 	})
 }

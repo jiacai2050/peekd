@@ -64,7 +64,7 @@ func formatXML(content []byte) (string, error) {
 
 func RenderXMLPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content string) error {
 	return executeTemplate(w, tmpl, xmlPreviewData{
-		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, "🧾", ""),
+		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, ""),
 		Content:       content,
 	})
 }

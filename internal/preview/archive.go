@@ -104,7 +104,7 @@ func RenderArchivePreview(w http.ResponseWriter, tmpl *template.Template, reques
 		return err
 	}
 	return executeTemplate(w, tmpl, archivePreviewData{
-		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, "📦", fmt.Sprintf("%d entries", len(entries))),
+		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, fmt.Sprintf("%d entries", len(entries))),
 		Entries:       entries,
 	})
 }

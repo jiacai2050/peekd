@@ -1,0 +1,11 @@
+{{template "preview-header" .}}
+        <div class="ebook-meta">
+            {{if .Title}}<div class="meta-row"><span class="meta-label">Title</span><span class="meta-value">{{.Title}}</span></div>{{end}}
+            {{if .Author}}<div class="meta-row"><span class="meta-label">Author</span><span class="meta-value">{{.Author}}</span></div>{{end}}
+            {{if .Publisher}}<div class="meta-row"><span class="meta-label">Publisher</span><span class="meta-value">{{.Publisher}}</span></div>{{end}}
+            {{if .ISBN}}<div class="meta-row"><span class="meta-label">ISBN</span><span class="meta-value">{{.ISBN}}</span></div>{{end}}
+            {{if .PublishingDate}}<div class="meta-row"><span class="meta-label">Published</span><span class="meta-value">{{.PublishingDate}}</span></div>{{end}}
+            {{if .Subject}}<div class="meta-row"><span class="meta-label">Subject</span><span class="meta-value">{{.Subject}}</span></div>{{end}}
+            {{if .Description}}<div class="meta-row"><span class="meta-label">Description</span><span class="meta-value">{{.Description}}</span></div>{{end}}
+        </div>
+{{template "preview-footer" .}}

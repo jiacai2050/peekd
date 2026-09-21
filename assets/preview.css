@@ -398,6 +398,36 @@ pre {
     max-width: 100%;
 }
 
+/* === Ebook metadata ====================================================== */
+
+.ebook-meta {
+    padding: 24px;
+}
+
+.meta-row {
+    display: flex;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 10px 0;
+}
+
+.meta-row:last-child {
+    border-bottom: 0;
+}
+
+.meta-label {
+    color: #6b7280;
+    flex-shrink: 0;
+    font-size: 13px;
+    width: 100px;
+}
+
+.meta-value {
+    color: #111827;
+    flex: 1;
+    font-size: 14px;
+    word-break: break-word;
+}
+
 /* === Directory listing =================================================== */
 
 .directory {
@@ -628,6 +658,18 @@ pre {
 
     .csv-list th {
         background: #374151;
+    }
+
+    .meta-label {
+        color: #9ca3af;
+    }
+
+    .meta-value {
+        color: #e5e7eb;
+    }
+
+    .meta-row {
+        border-color: #374151;
     }
 
     .csv-list th,

@@ -13,7 +13,7 @@ type htmlPreviewData struct {
 
 func RenderHTMLPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content string) error {
 	return executeTemplate(w, tmpl, htmlPreviewData{
-		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, "🌐", ""),
+		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, ""),
 		Content:       content,
 	})
 }
