@@ -14,7 +14,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
+	"cmp"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -253,12 +254,11 @@ func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPat
 		})
 	}
 
-	sort.Slice(data.Entries, func(i, j int) bool {
-		left, right := data.Entries[i], data.Entries[j]
-		if !left.ModTime.Equal(right.ModTime) {
-			return left.ModTime.After(right.ModTime)
+	slices.SortFunc(data.Entries, func(a, b directoryEntry) int {
+		if c := b.ModTime.Compare(a.ModTime); c != 0 {
+			return c // descending by time
 		}
-		return strings.ToLower(left.Name) < strings.ToLower(right.Name)
+		return cmp.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
