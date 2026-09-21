@@ -31,7 +31,7 @@ var testEmbeddedFiles = fstest.MapFS{
 	"assets/xml.html":            {Data: []byte("<!doctype html><body>xml {{.FileName}}<pre>{{.Content}}</pre></body>")},
 	"assets/csv.html":            {Data: []byte("<!doctype html><body>csv {{.FileName}} {{range $row := .Rows}}{{range $row}}{{.}}|{{end}}{{end}}</body>")},
 	"assets/pdf.html":            {Data: []byte("<!doctype html><body>pdf {{.FileName}} {{.RawURL}}</body>")},
-	"assets/archive.html":        {Data: []byte("<!doctype html><body>archive {{.FileName}} {{range .Entries}}{{.Name}}|{{.Size}}{{end}}</body>")},
+	"assets/archive.html":        {Data: []byte("<!doctype html><body>archive {{.FileName}} {{range .Entries}}{{.Name}}|{{.UncompressedSize}}{{end}}</body>")},
 	"assets/markdown.html":       {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
 	"assets/mobi.html":           {Data: []byte("<!doctype html><body>mobi {{.FileName}} {{.Title}} {{.Author}} {{.PublishingDate}}</body>")},
 	"assets/preview.css":         {Data: []byte("body{}")},

@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"html/template"
@@ -14,7 +15,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"cmp"
 	"slices"
 	"strconv"
 	"strings"
@@ -156,7 +156,7 @@ func directoryEntryURL(requestPath, name string, isDir bool) string {
 	return (&url.URL{Path: entryPath}).String()
 }
 
-func setCacheHeaders(w http.ResponseWriter, info os.FileInfo) {
+func setCacheHeaders(w http.ResponseWriter, info os.FileInfo, version string) {
 	w.Header().Set("Cache-Control", "no-cache")
 	if info.ModTime().IsZero() {
 		return
@@ -168,7 +168,7 @@ func setCacheHeaders(w http.ResponseWriter, info os.FileInfo) {
 	if info.IsDir() {
 		resourceType = "directory"
 	}
-	w.Header().Set("ETag", fmt.Sprintf("W/\"%s-%x-%x\"", resourceType, info.Size(), modified.UnixNano()))
+	w.Header().Set("ETag", fmt.Sprintf("W/\"%s-%s-%x-%x\"", resourceType, version, info.Size(), modified.UnixNano()))
 }
 
 func etagMatches(header, etag string) bool {
@@ -193,8 +193,8 @@ func validateETag(w http.ResponseWriter, r *http.Request, etag string) bool {
 	return false
 }
 
-func validateCache(w http.ResponseWriter, r *http.Request, info os.FileInfo) bool {
-	setCacheHeaders(w, info)
+func validateCache(w http.ResponseWriter, r *http.Request, info os.FileInfo, version string) bool {
+	setCacheHeaders(w, info, version)
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return false
 	}
@@ -415,7 +415,7 @@ func NewHandler(config Config) (http.Handler, error) {
 			return
 		}
 
-		if validateCache(w, r, info) {
+		if validateCache(w, r, info, config.Version) {
 			return
 		}
 		if info.IsDir() {

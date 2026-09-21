@@ -12,11 +12,26 @@ import (
 	"strings"
 )
 
+func zipMethodString(method uint16) string {
+	switch method {
+	case zip.Store:
+		return "Store"
+	case zip.Deflate:
+		return "Deflate"
+	default:
+		return fmt.Sprintf("Unknown(%d)", method)
+	}
+}
+
 type archivePreviewEntry struct {
-	Name     string
-	Size     string
-	Modified string
-	IsDir    bool
+	Name             string
+	CompressedSize   string
+	UncompressedSize string
+	Ratio            string
+	Method           string
+	Permissions      string
+	Modified         string
+	IsDir            bool
 }
 
 type archivePreviewData struct {
@@ -34,15 +49,31 @@ func readZIPPreview(filePath string) ([]archivePreviewEntry, error) {
 	entries := make([]archivePreviewEntry, 0, len(reader.File))
 	for _, file := range reader.File {
 		isDir := file.FileInfo().IsDir()
-		size := "-"
-		if !isDir {
-			size = FormatFileSize(int64(file.UncompressedSize64))
+		compressedSize := "-"
+		uncompressedSize := "-"
+		ratio := "-"
+		method := "-"
+		permissions := "-"
+		if isDir {
+			method = "Dir"
+		} else {
+			compressedSize = FormatFileSize(int64(file.CompressedSize64))
+			uncompressedSize = FormatFileSize(int64(file.UncompressedSize64))
+			if file.UncompressedSize64 > 0 {
+				ratio = fmt.Sprintf("%.0f%%", float64(file.CompressedSize64)/float64(file.UncompressedSize64)*100)
+			}
+			method = zipMethodString(file.Method)
+			permissions = file.Mode().String()
 		}
 		entries = append(entries, archivePreviewEntry{
-			Name:     file.Name,
-			Size:     size,
-			Modified: file.Modified.Format("2006-01-02 15:04:05"),
-			IsDir:    isDir,
+			Name:             file.Name,
+			CompressedSize:   compressedSize,
+			UncompressedSize: uncompressedSize,
+			Ratio:            ratio,
+			Method:           method,
+			Permissions:      permissions,
+			Modified:         file.Modified.Format("2006-01-02 15:04:05"),
+			IsDir:            isDir,
 		})
 	}
 	return entries, nil
@@ -78,15 +109,27 @@ func readTARPreview(filePath string) ([]archivePreviewEntry, error) {
 		}
 
 		isDir := header.Typeflag == tar.TypeDir
-		size := "-"
-		if !isDir {
-			size = FormatFileSize(header.Size)
+		compressedSize := "-"
+		uncompressedSize := "-"
+		ratio := "-"
+		method := "-"
+		permissions := "-"
+		if isDir {
+			method = "Dir"
+		} else {
+			uncompressedSize = FormatFileSize(header.Size)
+			method = "tar"
+			permissions = os.FileMode(header.Mode).String()
 		}
 		entries = append(entries, archivePreviewEntry{
-			Name:     header.Name,
-			Size:     size,
-			Modified: header.ModTime.Format("2006-01-02 15:04:05"),
-			IsDir:    isDir,
+			Name:             header.Name,
+			CompressedSize:   compressedSize,
+			UncompressedSize: uncompressedSize,
+			Ratio:            ratio,
+			Method:           method,
+			Permissions:      permissions,
+			Modified:         header.ModTime.Format("2006-01-02 15:04:05"),
+			IsDir:            isDir,
 		})
 	}
 }

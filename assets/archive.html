@@ -4,6 +4,7 @@
                 <thead>
                     <tr>
                         <th>Name</th>
+                        <th>Perms</th>
                         <th>Size</th>
                         <th>Modified</th>
                     </tr>
@@ -11,12 +12,13 @@
                 <tbody>
                     {{range .Entries}}
                     <tr{{if .IsDir}} class="archive-directory"{{end}}>
-                        <td title="{{.Name}}">{{.Name}}</td>
-                        <td>{{.Size}}</td>
+                        <td title="Compressed: {{.CompressedSize}}&#10;Ratio: {{.Ratio}}&#10;Method: {{.Method}}">{{.Name}}</td>
+                        <td>{{.Permissions}}</td>
+                        <td>{{.UncompressedSize}}</td>
                         <td>{{.Modified}}</td>
                     </tr>
                     {{else}}
-                    <tr><td colspan="3">This archive is empty.</td></tr>
+                    <tr><td colspan="4">This archive is empty.</td></tr>
                     {{end}}
                 </tbody>
             </table>
