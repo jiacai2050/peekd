@@ -21,7 +21,6 @@ var Version = "dev-" + time.Now().Format("20060102-150405")
 const ProjectURL = "https://github.com/jiacai2050/peekd"
 
 func main() {
-	rootDir := flag.String("root", ".", "directory to serve")
 	addr := flag.String("addr", ":8090", "HTTP server address")
 	maxTextPreviewSize := int64(4 << 20)
 	flag.Func("max-preview-size", "maximum text preview size (default 4M; e.g. 512K or 4194304)", func(value string) error {
@@ -50,7 +49,12 @@ func main() {
 		return
 	}
 
-	absoluteRootDir, err := filepath.Abs(*rootDir)
+	rootDir := "."
+	if flag.NArg() > 0 {
+		rootDir = flag.Arg(0)
+	}
+
+	absoluteRootDir, err := filepath.Abs(rootDir)
 	if err != nil {
 		log.Fatalf("failed to resolve root directory: %v", err)
 	}

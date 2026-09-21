@@ -42,7 +42,7 @@ Build the server and trace both normal writes and `sendfile`:
 
 ```bash
 go build -o peekd .
-strace -ttt -f -e trace=write,writev,sendfile ./peekd -root /path/to/files
+strace -ttt -f -e trace=write,writev,sendfile ./peekd /path/to/files
 ```
 
 From another terminal, request a regular binary file:

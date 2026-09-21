@@ -4,7 +4,7 @@ This directory contains small files for manually testing the supported
 previews. Start Peekd with:
 
 ```sh
-go run . -root ./test
+go run . ./test
 ```
 
 ## Mermaid

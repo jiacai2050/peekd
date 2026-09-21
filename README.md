@@ -49,7 +49,7 @@ peekd
 Serve another directory:
 
 ```bash
-peekd -root ~/Downloads -addr :9000
+peekd ~/Downloads -addr :9000
 ```
 
 If the selected port is occupied, Peekd tries the next port automatically.
