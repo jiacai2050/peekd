@@ -522,7 +522,8 @@ pre {
     text-align: right;
 }
 
-.directory .copy-button {
+.directory .copy-button,
+.directory .download-button {
     background: transparent;
     border: 1px solid #cbd5e1;
     border-radius: 5px;
@@ -533,7 +534,8 @@ pre {
     padding: 6px 10px;
 }
 
-.directory .copy-button:hover {
+.directory .copy-button:hover,
+.directory .download-button:hover {
     background: #e2e8f0;
 }
 
@@ -700,12 +702,14 @@ pre {
         color: #93c5fd;
     }
 
-    .copy-button {
+    .copy-button,
+    .download-button {
         border-color: #475569;
         color: #cbd5e1;
     }
 
-    .copy-button:hover {
+    .copy-button:hover,
+    .download-button:hover {
         background: #1e293b;
     }
 }

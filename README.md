@@ -98,6 +98,18 @@ download with:
 curl -C - -O http://127.0.0.1:8090/large-file.iso
 ```
 
+## Directory download
+
+Any directory can be downloaded as a ZIP archive. Click the **↓ ZIP** button in
+the directory header, or append `?download=zip` to the directory URL:
+
+```bash
+curl -O http://127.0.0.1:8090/my-folder/?download=zip
+```
+
+The archive is generated on the fly using deflate compression, preserving the
+directory structure and file permissions.
+
 ## Development
 
 ```bash

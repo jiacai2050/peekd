@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"archive/zip"
 	"cmp"
 	"errors"
 	"fmt"
@@ -214,6 +215,55 @@ func validateCache(w http.ResponseWriter, r *http.Request, info os.FileInfo, ver
 	return false
 }
 
+func serveDirectoryZip(w http.ResponseWriter, r *http.Request, rootDir, requestPath string) {
+	dirName := filepath.Base(requestPath)
+	if dirName == "." || dirName == "/" {
+		dirName = "directory"
+	}
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.zip"`, dirName))
+
+	basePath := filepath.Join(rootDir, filepath.FromSlash(requestPath))
+	zipWriter := zip.NewWriter(w)
+	defer zipWriter.Close()
+
+	filepath.Walk(basePath, func(filePath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip inaccessible entries
+		}
+		relPath, err := filepath.Rel(basePath, filePath)
+		if err != nil {
+			return nil
+		}
+		if relPath == "." {
+			return nil
+		}
+		header, err := zip.FileInfoHeader(info)
+		if err != nil {
+			return nil
+		}
+		header.Name = filepath.ToSlash(relPath)
+		if info.IsDir() {
+			header.Name += "/"
+		}
+		header.Method = zip.Deflate
+		writer, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() || !info.Mode().IsRegular() {
+			return nil
+		}
+		file, err := os.Open(filePath)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+		io.Copy(writer, file)
+		return nil
+	})
+}
+
 func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPath string, tmpl *template.Template, projectURL string, version string) {
 	fullPath := filepath.Join(rootDir, filepath.FromSlash(requestPath))
 	entries, err := os.ReadDir(fullPath)
@@ -422,6 +472,10 @@ func NewHandler(config Config) (http.Handler, error) {
 			return
 		}
 		if info.IsDir() {
+			if r.URL.Query().Get("download") == "zip" {
+				serveDirectoryZip(w, r, config.RootDir, cleanedPath)
+				return
+			}
 			renderDirectory(w, r, config.RootDir, cleanedPath, directoryTemplate, config.ProjectURL, config.Version)
 			return
 		}

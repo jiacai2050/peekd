@@ -14,7 +14,8 @@
             </nav>
             <div class="directory-actions">
                 <input class="filter-input" type="text" placeholder="Filter…" autocomplete="off" spellcheck="false">
-                <button class="copy-button" type="button" data-copy-path="{{.LocalPath}}">Copy local path</button>
+                <button class="copy-button" type="button" data-copy-path="{{.LocalPath}}">Copy path</button>
+                <a class="download-button" href="?download=zip">↓ ZIP</a>
                 <span class="entry-count">{{len .Entries}} items</span>
             </div>
         </header>
@@ -24,9 +25,6 @@
             <a class="file-row directory-row" href="../">
                 <span class="file-icon">↩</span>
                 <span class="file-name">Parent directory</span>
-                <span class="file-mode">—</span>
-                <span class="file-meta">—</span>
-                <span class="file-date">—</span>
             </a>
             {{end}}
             {{range .Entries}}
