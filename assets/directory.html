@@ -13,6 +13,7 @@
                 {{range $index, $item := .Breadcrumbs}}{{if $index}}<span class="breadcrumb-separator">/</span>{{end}}{{if $item.Current}}<span aria-current="page">{{$item.Name}}</span>{{else}}<a href="{{$item.URL}}">{{$item.Name}}</a>{{end}}{{end}}
             </nav>
             <div class="directory-actions">
+                <input class="filter-input" type="text" placeholder="Filter…" autocomplete="off" spellcheck="false">
                 <button class="copy-button" type="button" data-copy-path="{{.LocalPath}}">Copy local path</button>
                 <span class="entry-count">{{len .Entries}} items</span>
             </div>
@@ -40,4 +41,31 @@
             <div class="empty">This directory is empty.</div>
             {{end}}
         </section>
+<script>
+(function() {
+    var input = document.querySelector('.filter-input');
+    if (!input) return;
+    var rows = document.querySelectorAll('.file-list .file-row');
+    var parentRow = document.querySelector('.file-list .file-row[href="../"]');
+    input.addEventListener('input', function() {
+        var q = input.value.toLowerCase();
+        rows.forEach(function(row) {
+            if (row === parentRow) return;
+            var name = row.querySelector('.file-name');
+            row.style.display = name && name.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+        });
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === '/' && document.activeElement !== input) {
+            e.preventDefault();
+            input.focus();
+        }
+        if (e.key === 'Escape' && document.activeElement === input) {
+            input.value = '';
+            input.dispatchEvent(new Event('input'));
+            input.blur();
+        }
+    });
+})();
+</script>
 {{template "preview-footer" .}}

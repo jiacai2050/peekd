@@ -447,6 +447,21 @@ pre {
     gap: 12px;
 }
 
+.filter-input {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 4px 8px;
+    width: 140px;
+}
+
+.filter-input:focus {
+    border-color: #2563eb;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
 .entry-count {
     color: #64748b;
     font-size: 14px;
