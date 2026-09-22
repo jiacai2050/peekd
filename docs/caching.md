@@ -11,14 +11,16 @@ For directory pages, generated previews, and direct files, Peekd sends:
 ```http
 Cache-Control: no-cache
 Last-Modified: <file modification time>
-ETag: W/"<resource type>-<file size>-<modification time>"
+ETag: W/"<version>-<request path>-<modification time>"
 ```
 
 `no-cache` does not prevent the browser from storing a response. It requires
 the browser to revalidate the response before reusing it.
 
-The file ETag is a weak validator based on the file size and modification time.
-It avoids reading and hashing the complete file on every request, which is
+The file ETag is a weak validator based on the application version, request
+path, and modification time. The request path ensures that switching the served
+directory never produces identical ETags for different resources. Modification
+time avoids reading and hashing the complete file on every request, which is
 important for large files.
 
 Embedded assets use an ETag based on the application version and request path.
@@ -40,15 +42,18 @@ Peekd checks `If-None-Match` first. If the ETag matches, it returns:
 HTTP/1.1 304 Not Modified
 ```
 
-The response has no body, so the browser uses its cached content. If there is
-no matching ETag, Peekd falls back to `If-Modified-Since`. A matching
-modification time also produces `304 Not Modified`; otherwise Peekd returns the
-new content with updated validators.
+The response has no body, so the browser uses its cached content.
+
+`If-Modified-Since` is only used when the client does not send `If-None-Match`.
+When both headers are present, ETag alone decides. This prevents a stale
+`If-Modified-Since` from incorrectly returning `304` for a different resource
+that happens to have an older modification time (for example, after restarting
+the server with a different root directory).
 
 The `Last-Modified` value uses HTTP's second-level timestamp precision. ETags
-provide finer-grained validation, but they still cannot detect a change when a
-file's content changes while both its size and modification time are preserved
-exactly.
+provide finer-grained validation with the added request-path component, but
+they still cannot detect a change when a file's content changes while its
+modification time is preserved exactly.
 
 ## Direct files and previews
 
@@ -65,5 +70,5 @@ CSV/TSV, text, and archive previews after a successful revalidation.
 Peekd intentionally does not calculate a full content hash for every file.
 Hashing would provide stronger change detection, but would add file I/O and
 latency to ordinary browsing, especially for large files. The current
-size-plus-modification-time validator is a practical compromise for a local
+path-plus-modification-time validator is a practical compromise for a local
 file server.

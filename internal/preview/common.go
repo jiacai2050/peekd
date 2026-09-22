@@ -46,9 +46,9 @@ func PreviewTypeByExtension(filePath string) PreviewType {
 		return PreviewTypeTSV
 	case ".mobi":
 		return PreviewTypeMOBI
-	case ".txt", ".log", ".conf", ".ini", ".properties",
-		".jsonc", ".yaml", ".yml", ".toml",
-		".rst",
+	case ".txt", ".log", ".conf", ".ini", ".properties", ".rst":
+		return PreviewTypeText
+	case ".jsonc", ".yaml", ".yml", ".toml",
 		".css", ".scss", ".sass", ".less",
 		".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
 		".vue", ".svelte",
@@ -58,10 +58,12 @@ func PreviewTypeByExtension(filePath string) PreviewType {
 		".cs", ".fs", ".fsx",
 		".sh", ".bash", ".zsh", ".fish", ".ps1",
 		".sql":
-		return PreviewTypeText
+		return PreviewTypeCode
 	default:
 		switch strings.ToLower(filepath.Base(filePath)) {
-		case "makefile", "dockerfile", "jenkinsfile", "justfile", "license":
+		case "makefile", "dockerfile", "jenkinsfile", "justfile":
+			return PreviewTypeCode
+		case "license":
 			return PreviewTypeText
 		default:
 			return PreviewTypeNone
@@ -106,7 +108,7 @@ func FileIcon(path string, isDir bool) string {
 		return "🎵"
 	case PreviewTypeVideo:
 		return "🎬"
-	case PreviewTypeText, PreviewTypeMarkdown, PreviewTypeCSV, PreviewTypeTSV:
+	case PreviewTypeText, PreviewTypeCode, PreviewTypeMarkdown, PreviewTypeCSV, PreviewTypeTSV:
 		return "📄"
 	case PreviewTypeHTML:
 		return "🌐"
@@ -174,6 +176,7 @@ type PreviewType string
 const (
 	PreviewTypeNone     PreviewType = ""
 	PreviewTypeText     PreviewType = "text"
+	PreviewTypeCode     PreviewType = "code"
 	PreviewTypeHTML     PreviewType = "html"
 	PreviewTypeMarkdown PreviewType = "markdown"
 	PreviewTypeImage    PreviewType = "image"

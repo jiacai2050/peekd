@@ -23,6 +23,7 @@ import (
 var testEmbeddedFiles = fstest.MapFS{
 	"assets/preview-common.html": {Data: []byte(`{{define "preview-header"}}<head><title>{{.FileName}}</title></head>{{end}}{{define "preview-footer"}}<footer>{{.Version}} {{.ProjectURL}}</footer>{{end}}`)},
 	"assets/text.html":           {Data: []byte("<!doctype html><body>{{range .Lines}}{{.}}\n{{end}}</body>")},
+	"assets/code.html":           {Data: []byte("<!doctype html><body>code {{.Content}}</body>")},
 	"assets/html.html":           {Data: []byte("<!doctype html><body>html {{.FileName}}<iframe sandbox srcdoc=\"{{.Content}}\"></iframe></body>")},
 	"assets/directory.html":      {Data: []byte("<!doctype html><body><a href=\"/\">Peekd</a>{{if .HasParent}}<a href=\"../\">Parent directory</a>{{end}}{{range .Entries}}<div class=\"entry\">{{.Name}}|{{.URL}}|{{.FileModeBits}}|{{.Modified}}</div>{{end}}</body>")},
 	"assets/image.html":          {Data: []byte("<!doctype html><body>image {{.FileName}}</body>")},
@@ -714,6 +715,7 @@ func TestNewHandlerRequiresMarkdownTemplate(t *testing.T) {
 	missingMarkdownTemplate := fstest.MapFS{
 		"assets/preview-common.html": {Data: []byte("common")},
 		"assets/text.html":           {Data: []byte("text")},
+		"assets/code.html":           {Data: []byte("code")},
 		"assets/html.html":           {Data: []byte("html")},
 		"assets/directory.html":      {Data: []byte("directory")},
 		"assets/image.html":          {Data: []byte("image")},

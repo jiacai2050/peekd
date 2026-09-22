@@ -156,7 +156,7 @@ func directoryEntryURL(requestPath, name string, isDir bool) string {
 	return (&url.URL{Path: entryPath}).String()
 }
 
-func setCacheHeaders(w http.ResponseWriter, info os.FileInfo, version string) {
+func setCacheHeaders(w http.ResponseWriter, info os.FileInfo, path, version string) {
 	w.Header().Set("Cache-Control", "no-cache")
 	if info.ModTime().IsZero() {
 		return
@@ -164,11 +164,7 @@ func setCacheHeaders(w http.ResponseWriter, info os.FileInfo, version string) {
 
 	modified := info.ModTime().UTC()
 	w.Header().Set("Last-Modified", modified.Format(http.TimeFormat))
-	resourceType := "file"
-	if info.IsDir() {
-		resourceType = "directory"
-	}
-	w.Header().Set("ETag", fmt.Sprintf("W/\"%s-%s-%x-%x\"", resourceType, version, info.Size(), modified.UnixNano()))
+	w.Header().Set("ETag", fmt.Sprintf("W/\"%s-%s-%x\"", version, path, modified.UnixNano()))
 }
 
 func etagMatches(header, etag string) bool {
@@ -194,7 +190,7 @@ func validateETag(w http.ResponseWriter, r *http.Request, etag string) bool {
 }
 
 func validateCache(w http.ResponseWriter, r *http.Request, info os.FileInfo, version string) bool {
-	setCacheHeaders(w, info, version)
+	setCacheHeaders(w, info, r.URL.Path, version)
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return false
 	}
@@ -204,13 +200,16 @@ func validateCache(w http.ResponseWriter, r *http.Request, info os.FileInfo, ver
 		return true
 	}
 
-	if etag == "" {
-		return false
-	}
-	if modifiedSince, err := http.ParseTime(r.Header.Get("If-Modified-Since")); err == nil &&
-		!info.ModTime().After(modifiedSince.Add(time.Second)) {
-		w.WriteHeader(http.StatusNotModified)
-		return true
+	// Only use If-Modified-Since when the client does not send an ETag.
+	// When both are present, ETag alone decides — If-Modified-Since can
+	// incorrectly return 304 for a different resource that has an older
+	// modification time (e.g. serving a different directory after restart).
+	if r.Header.Get("If-None-Match") == "" {
+		if modifiedSince, err := http.ParseTime(r.Header.Get("If-Modified-Since")); err == nil &&
+			!info.ModTime().After(modifiedSince.Add(time.Second)) {
+			w.WriteHeader(http.StatusNotModified)
+			return true
+		}
 	}
 	return false
 }
@@ -335,6 +334,10 @@ func NewHandler(config Config) (http.Handler, error) {
 	textTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/text.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse embedded template: %w", err)
+	}
+	codeTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/code.html", "assets/preview-common.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse code template: %w", err)
 	}
 	htmlTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/html.html", "assets/preview-common.html")
 	if err != nil {
@@ -492,6 +495,10 @@ func NewHandler(config Config) (http.Handler, error) {
 
 		case preview.PreviewTypeText:
 			if err := preview.RenderTextPreview(w, textTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Formatted); err != nil {
+				log.Printf("failed to render text preview %s: %v", r.URL.Path, err)
+			}
+		case preview.PreviewTypeCode:
+			if err := preview.RenderTextPreview(w, codeTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Formatted); err != nil {
 				log.Printf("failed to render text preview %s: %v", r.URL.Path, err)
 			}
 

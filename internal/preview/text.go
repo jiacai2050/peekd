@@ -11,7 +11,8 @@ import (
 
 type textPreviewData struct {
 	PreviewCommon
-	Lines []string
+	Content string
+	Lines   []string
 }
 
 type PreparedTextPreview struct {
@@ -25,7 +26,7 @@ func formatPreviewContent(preview PreviewType, content []byte) (PreparedTextPrev
 	var prepared PreparedTextPreview
 	var err error
 	switch preview {
-	case PreviewTypeHTML, PreviewTypeText:
+	case PreviewTypeHTML, PreviewTypeText, PreviewTypeCode:
 		prepared.Formatted = string(content)
 	case PreviewTypeJSON:
 		prepared.Formatted, err = formatJSON(content)
@@ -84,7 +85,7 @@ func PrepareTextPreview(preview PreviewType, filePath string, fileSize, maxSize 
 
 func previewNeedsContent(preview PreviewType) bool {
 	switch preview {
-	case PreviewTypeHTML, PreviewTypeCSV, PreviewTypeTSV, PreviewTypeJSON, PreviewTypeXML, PreviewTypeText, PreviewTypeMarkdown:
+	case PreviewTypeHTML, PreviewTypeCSV, PreviewTypeTSV, PreviewTypeJSON, PreviewTypeXML, PreviewTypeText, PreviewTypeCode, PreviewTypeMarkdown:
 		return true
 	default:
 		return false
@@ -102,6 +103,7 @@ func splitLines(content string) []string {
 func RenderTextPreview(w http.ResponseWriter, tmpl *template.Template, requestPath, filePath string, info os.FileInfo, config Config, content string) error {
 	return executeTemplate(w, tmpl, textPreviewData{
 		PreviewCommon: newPreviewCommon(requestPath, filePath, info, config, ""),
+		Content:       content,
 		Lines:         splitLines(content),
 	})
 }
