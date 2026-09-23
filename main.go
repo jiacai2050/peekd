@@ -16,9 +16,18 @@ import (
 //go:embed assets/*
 var embeddedFiles embed.FS
 
-var Version = "dev-" + time.Now().Format("20060102-150405")
+// Version is set at build time via -ldflags "-X main.Version=...".
+// When not overridden (e.g. go run, plain go build), init() appends a
+// timestamp so each rebuild produces a unique ETag and avoids stale caches.
+var Version = "dev"
 
 const ProjectURL = "https://github.com/jiacai2050/peekd"
+
+func init() {
+	if Version == "dev" {
+		Version = "dev-" + time.Now().Format("20060102-150405")
+	}
+}
 
 func main() {
 	addr := flag.String("addr", ":8090", "HTTP server address")

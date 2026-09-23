@@ -3,6 +3,7 @@ package internal
 import (
 	"archive/zip"
 	"cmp"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"html/template"
@@ -165,7 +166,8 @@ func setCacheHeaders(w http.ResponseWriter, info os.FileInfo, path, version stri
 
 	modified := info.ModTime().UTC()
 	w.Header().Set("Last-Modified", modified.Format(http.TimeFormat))
-	w.Header().Set("ETag", fmt.Sprintf("W/\"%s-%s-%x\"", version, path, modified.UnixNano()))
+	pathHash := sha256.Sum256([]byte(path))
+	w.Header().Set("ETag", fmt.Sprintf("W/\"%s-%x-%x\"", version, pathHash[:8], modified.UnixNano()))
 }
 
 func etagMatches(header, etag string) bool {
