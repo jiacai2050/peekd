@@ -34,4 +34,10 @@ vet:
 
 check: fmt-check vet test
 
-.PHONY: build test run fmt fmt-check vet check
+EXCLUDE = --exclude "*webp" --exclude "*svg" --exclude "*gif" --exclude "saved-imgs"
+
+webp:
+	fd -t f $(EXCLUDE) --full-path './docs/images' --exec convert {} {.}.webp \;
+	fd -t f $(EXCLUDE) --full-path './docs/images' --exec rm {} \;
+
+.PHONY: build test run fmt fmt-check vet check webp

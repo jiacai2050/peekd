@@ -3,14 +3,19 @@
 Peekd is a lightweight web file server for quickly browsing and sharing local
 files.
 
-| Directory | Markdown |
-| :---: | :---: |
-| ![Directory](docs/directory.webp) | ![Text preview](docs/markdown.webp) |
+![](docs/images/banner.svg)
+
+> https://jiacai2050.github.io/peekd/
 
 ## Highlights
 
-- Rich previews for Markdown (including Mermaid diagrams), HTML, XML, code, text, CSV, TSV, images, audio, video, PDF, and
-  standard-library archive listings (ZIP, TAR, and TAR.GZ).
+- Rich previews for Markdown (including Mermaid diagrams), HTML, XML, code, text, CSV, TSV, images, audio, video, PDF, and standard-library archive listings (ZIP, TAR, and TAR.GZ).
+
+| ![Directory](docs/images/dir.webp) | ![markdown](docs/images/markdown.webp) |
+| :---: | :---: |
+| ![zip](docs/images/zip.webp) | ![csv](docs/images/csv.webp) |
+
+
 - Fast direct file serving with HTTP range and [`sendfile`](docs/sendfile.md) support
 - Lightweight single binary with automatic dark mode
 
