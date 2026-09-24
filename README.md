@@ -9,7 +9,7 @@ files.
 
 ## Highlights
 
-- Rich previews for Markdown (including Mermaid diagrams), HTML, XML, code, text, CSV, TSV, images, audio, video, PDF, and standard-library archive listings (ZIP, TAR, and TAR.GZ).
+- Rich previews for markdown, html, xml, code, text, csv, tsv, images, audio, video, PDF, and standard-library archive listings (ZIP, TAR, and TAR.GZ).
 
 | ![Directory](docs/images/dir.webp) | ![markdown](docs/images/markdown.webp) |
 | :---: | :---: |
@@ -26,14 +26,14 @@ files.
 Install the latest release on Linux or macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jiacai2050/peekd/main/install.sh | sh
+curl -fsSL https://jiacai2050.github.io/peekd/install.sh | sh
 ```
 
 Install a specific version or location:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jiacai2050/peekd/main/install.sh | sh -s -- \
-  --version v1.0.0 \
+curl -fsSL https://jiacai2050.github.io/peekd/install.sh | sh -s -- \
+  --version v1.2.1 \
   --prefix "$HOME/.local/bin"
 ```
 
