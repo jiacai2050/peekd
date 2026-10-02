@@ -431,6 +431,10 @@ func NewHandler(config Config) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse markdown template: %w", err)
 	}
+	orgTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/org.html", "assets/preview-common.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse org template: %w", err)
+	}
 	mobiTemplate, err := template.ParseFS(config.EmbeddedFiles, "assets/mobi.html", "assets/preview-common.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse MOBI template: %w", err)
@@ -547,6 +551,11 @@ func NewHandler(config Config) (http.Handler, error) {
 		case preview.PreviewTypeMarkdown:
 			if err := preview.RenderMarkdownPreview(w, markdownTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Formatted); err != nil {
 				log.Printf("failed to render markdown preview %s: %v", r.URL.Path, err)
+			}
+
+		case preview.PreviewTypeOrg:
+			if err := preview.RenderOrgPreview(w, orgTemplate, r.URL.Path, fullPath, info, previewConfig, prepared.Formatted); err != nil {
+				log.Printf("failed to render org preview %s: %v", r.URL.Path, err)
 			}
 
 		case preview.PreviewTypeText:

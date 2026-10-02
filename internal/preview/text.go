@@ -34,6 +34,8 @@ func formatPreviewContent(preview PreviewType, content []byte) (PreparedTextPrev
 		prepared.Formatted, err = formatXML(content)
 	case PreviewTypeMarkdown:
 		prepared.Formatted, err = RenderMarkdown(content)
+	case PreviewTypeOrg:
+		prepared.Formatted, err = RenderOrg(content)
 	case PreviewTypeCSV:
 		prepared.Formatted = string(content)
 		prepared.Rows, err = ParseCSVPreview(content, ',')
@@ -85,7 +87,7 @@ func PrepareTextPreview(preview PreviewType, filePath string, fileSize, maxSize 
 
 func previewNeedsContent(preview PreviewType) bool {
 	switch preview {
-	case PreviewTypeHTML, PreviewTypeCSV, PreviewTypeTSV, PreviewTypeJSON, PreviewTypeXML, PreviewTypeText, PreviewTypeCode, PreviewTypeMarkdown:
+	case PreviewTypeHTML, PreviewTypeCSV, PreviewTypeTSV, PreviewTypeJSON, PreviewTypeXML, PreviewTypeText, PreviewTypeCode, PreviewTypeMarkdown, PreviewTypeOrg:
 		return true
 	default:
 		return false

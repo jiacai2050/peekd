@@ -1,0 +1,42 @@
+#+TITLE: Org Mode Preview Fixture
+
+* Introduction
+This is a sample Org mode file for testing [[https://github.com/jiacai2050/peekd][Peekd]] preview support.
+
+** Typography
+- *Bold text*
+- /Italic text/
+- _Underlined text_
+- +Strikethrough text+
+- ~Code text~
+- =Verbatim text=
+
+* Lists and Checkboxes
+- [X] Completed task
+- [-] Task in progress
+- [ ] Pending task
+
+* Tables
+| Feature    | Status      | Description                     |
+|------------+-------------+---------------------------------|
+| Markdown   | Supported   | GFM, Footnotes, Mermaid         |
+| Org Mode   | Supported   | Headlines, Lists, Code, Tables  |
+| CSV / TSV  | Supported   | Rendered as responsive tables   |
+
+* Source Code
+#+BEGIN_SRC go
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello from Org Mode!")
+}
+#+END_SRC
+
+* Mermaid Diagram
+#+BEGIN_SRC mermaid
+graph LR
+    Browser --> Peekd
+    Peekd --> OrgRenderer
+#+END_SRC

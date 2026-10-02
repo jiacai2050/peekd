@@ -9,7 +9,7 @@ files.
 
 ## Highlights
 
-- Rich previews for markdown, html, xml, code, text, csv, tsv, images, audio, video, PDF, and standard-library archive listings (ZIP, TAR, and TAR.GZ).
+- Rich previews for markdown, org mode, html, xml, code, text, csv, tsv, images, audio, video, PDF, and standard-library archive listings (ZIP, TAR, and TAR.GZ).
 
 | ![Directory](docs/images/dir.webp) | ![markdown](docs/images/markdown.webp) |
 | :---: | :---: |

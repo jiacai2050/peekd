@@ -34,6 +34,7 @@ var testEmbeddedFiles = fstest.MapFS{
 	"assets/pdf.html":            {Data: []byte("<!doctype html><body>pdf {{.FileName}} {{.RawURL}}</body>")},
 	"assets/archive.html":        {Data: []byte("<!doctype html><body>archive {{.FileName}} {{range .Entries}}{{.Name}}|{{.UncompressedSize}}{{end}}</body>")},
 	"assets/markdown.html":       {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
+	"assets/org.html":            {Data: []byte("<!doctype html><body>{{.HTML}}</body>")},
 	"assets/mobi.html":           {Data: []byte("<!doctype html><body>mobi {{.FileName}} {{.Title}} {{.Author}} {{.PublishingDate}}</body>")},
 	"assets/preview.css":         {Data: []byte("body{}")},
 }
@@ -582,6 +583,37 @@ func TestMarkdownPreviewForBrowserDisablesRawHTML(t *testing.T) {
 	}
 }
 
+func TestOrgPreviewForBrowserDisablesRawHTML(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "README.org")
+	content := "#+TITLE: Hello Org\n\n* Header\n\n<script>alert('xss')</script>\n\n*world*\n"
+	if err := os.WriteFile(filePath, []byte(content), 0o600); err != nil {
+		t.Fatalf("write org file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/README.org", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	body := response.Body.String()
+	if !strings.Contains(body, "Hello Org") {
+		t.Fatalf("expected org title in response body, got %q", body)
+	}
+	if !strings.Contains(body, "<strong>world</strong>") {
+		t.Fatalf("expected org emphasis in response body, got %q", body)
+	}
+	if strings.Contains(body, "<script>alert('xss')</script>") {
+		t.Fatalf("raw HTML was rendered in org output: %q", body)
+	}
+}
+
+
 func TestMarkdownPreviewRendersMermaid(t *testing.T) {
 	rendered, err := preview.RenderMarkdown([]byte("```mermaid\ngraph LR\n    A --> B\n```\n"))
 	if err != nil {
@@ -742,3 +774,59 @@ func TestNewHandlerRequiresMarkdownTemplate(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestNewHandlerRequiresOrgTemplate(t *testing.T) {
+	missingOrgTemplate := fstest.MapFS{
+		"assets/preview-common.html": {Data: []byte("common")},
+		"assets/text.html":           {Data: []byte("text")},
+		"assets/code.html":           {Data: []byte("code")},
+		"assets/html.html":           {Data: []byte("html")},
+		"assets/directory.html":      {Data: []byte("directory")},
+		"assets/image.html":          {Data: []byte("image")},
+		"assets/media.html":          {Data: []byte("media")},
+		"assets/json.html":           {Data: []byte("json")},
+		"assets/xml.html":            {Data: []byte("xml")},
+		"assets/csv.html":            {Data: []byte("csv")},
+		"assets/pdf.html":            {Data: []byte("pdf")},
+		"assets/archive.html":        {Data: []byte("archive")},
+		"assets/markdown.html":       {Data: []byte("markdown")},
+	}
+
+	_, err := NewHandler(Config{
+		RootDir:            ".",
+		Addr:               ":0",
+		MaxTextPreviewSize: 4 << 20,
+		Version:            "test",
+		ProjectURL:         "https://example.com",
+		EmbeddedFiles:      fs.FS(missingOrgTemplate),
+	})
+	if err == nil {
+		t.Fatal("expected org template parse error, got nil")
+	}
+	if !strings.Contains(err.Error(), "org template") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestOrgFileDefaultsToRaw(t *testing.T) {
+	rootDir := t.TempDir()
+	filePath := filepath.Join(rootDir, "test.org")
+	content := "* plain org\ncontent\n"
+	if err := os.WriteFile(filePath, []byte(content), 0o600); err != nil {
+		t.Fatalf("write org file: %v", err)
+	}
+
+	handler := mustNewHandler(t, rootDir, 4<<20)
+	request := httptest.NewRequest(http.MethodGet, "/test.org?raw=1", nil)
+	request.Header.Set("Sec-Fetch-Dest", "document")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", response.Code, http.StatusOK)
+	}
+	if got := response.Body.String(); got != content {
+		t.Fatalf("non-browser response = %q, want %q", got, content)
+	}
+}
+

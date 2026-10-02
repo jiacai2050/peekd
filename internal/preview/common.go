@@ -22,6 +22,8 @@ func PreviewTypeByExtension(filePath string) PreviewType {
 	switch strings.ToLower(filepath.Ext(filePath)) {
 	case ".md", ".markdown":
 		return PreviewTypeMarkdown
+	case ".org":
+		return PreviewTypeOrg
 	case ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg", ".tif", ".tiff", ".webp":
 		return PreviewTypeImage
 	case ".aac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".opus", ".wav", ".weba":
@@ -108,7 +110,7 @@ func FileIcon(path string, isDir bool) string {
 		return "🎵"
 	case PreviewTypeVideo:
 		return "🎬"
-	case PreviewTypeText, PreviewTypeCode, PreviewTypeMarkdown, PreviewTypeCSV, PreviewTypeTSV:
+	case PreviewTypeText, PreviewTypeCode, PreviewTypeMarkdown, PreviewTypeOrg, PreviewTypeCSV, PreviewTypeTSV:
 		return "📄"
 	case PreviewTypeHTML:
 		return "🌐"
@@ -179,6 +181,7 @@ const (
 	PreviewTypeCode     PreviewType = "code"
 	PreviewTypeHTML     PreviewType = "html"
 	PreviewTypeMarkdown PreviewType = "markdown"
+	PreviewTypeOrg      PreviewType = "org"
 	PreviewTypeImage    PreviewType = "image"
 	PreviewTypeAudio    PreviewType = "audio"
 	PreviewTypeVideo    PreviewType = "video"
