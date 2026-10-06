@@ -613,7 +613,6 @@ func TestOrgPreviewForBrowserDisablesRawHTML(t *testing.T) {
 	}
 }
 
-
 func TestMarkdownPreviewRendersMermaid(t *testing.T) {
 	rendered, err := preview.RenderMarkdown([]byte("```mermaid\ngraph LR\n    A --> B\n```\n"))
 	if err != nil {
@@ -1067,6 +1066,3 @@ func TestResolveRoots(t *testing.T) {
 		}
 	})
 }
-
-
-

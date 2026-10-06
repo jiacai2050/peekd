@@ -138,13 +138,13 @@ func newPreviewCommon(requestPath, filePath string, info os.FileInfo, config Con
 		rootParam = strconv.Itoa(config.CurrentRoot)
 	}
 	return PreviewCommon{
-		FileName:       previewFileName(filePath),
-		Icon:           FileIcon(filePath, info.IsDir()),
-		ExtraMeta:      extraMeta,
-		Size:           previewFileSize(info),
-		Modified:       previewModified(info),
-		RawURL:         previewRawURL(requestPath, rootParam),
-		Breadcrumbs:    Breadcrumbs(requestPath, false, rootParam),
+		FileName:    previewFileName(filePath),
+		Icon:        FileIcon(filePath, info.IsDir()),
+		ExtraMeta:   extraMeta,
+		Size:        previewFileSize(info),
+		Modified:    previewModified(info),
+		RawURL:      previewRawURL(requestPath, rootParam),
+		Breadcrumbs: Breadcrumbs(requestPath, false, rootParam),
 		LocalPath:   previewLocalPath(filePath),
 		ProjectURL:  config.ProjectURL,
 		Version:     config.Version,

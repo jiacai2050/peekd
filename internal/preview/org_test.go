@@ -85,4 +85,3 @@ graph LR
 		t.Fatalf("expected mermaid script tag, got: %s", html)
 	}
 }
-
