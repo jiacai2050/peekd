@@ -244,11 +244,18 @@ pre {
     overflow-x: auto;
     padding: 24px 0;
     white-space: pre;
+    background: #ffffff;
+    color: #24292e;
 }
 
 .code code {
     display: block;
     font: inherit;
+}
+
+.code code.hljs {
+    background: transparent;
+    padding: 0 24px;
 }
 
 .code-line {
@@ -694,6 +701,7 @@ pre {
 @media (prefers-color-scheme: dark) {
     body {
         background-color: #111827;
+        color: #e5e7eb;
     }
 
     .preview-container {
@@ -714,9 +722,109 @@ pre {
         color: #e5e7eb;
     }
 
+    /* === Directory listing dark mode ========================================= */
+
+    .file-list {
+        background: #1f2937;
+        border-color: #374151;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .file-row {
+        color: #e5e7eb;
+        border-bottom-color: #374151;
+    }
+
+    .file-row:hover {
+        background: #283548;
+    }
+
+    .file-icon {
+        color: #94a3b8;
+    }
+
+    .directory-row .file-icon,
+    .directory-row .file-name {
+        color: #60a5fa;
+    }
+
+    .directory .file-mode,
+    .directory .file-meta,
+    .directory .file-date {
+        color: #94a3b8;
+    }
+
+    .filter-input {
+        background: #111827;
+        color: #e5e7eb;
+        border-color: #4b5563;
+    }
+
+    .filter-input::placeholder {
+        color: #6b7280;
+    }
+
+    .filter-input:focus {
+        border-color: #60a5fa;
+        box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+    }
+
+    .entry-count {
+        color: #94a3b8;
+    }
+
+    .directory .copy-button,
+    .directory .download-button {
+        border-color: #475569;
+        color: #cbd5e1;
+    }
+
+    .directory .copy-button:hover,
+    .directory .download-button:hover {
+        background: #374151;
+    }
+
+    .empty {
+        color: #94a3b8;
+    }
+
     pre {
         background: #111827;
         color: #e5e7eb;
+    }
+
+    .code {
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+
+    .code code {
+        background: transparent;
+        color: inherit;
+    }
+
+    .code code.hljs {
+        background: transparent;
+    }
+
+    .xml-content {
+        background: #111827;
+        color: #e5e7eb;
+    }
+
+    .archive-list th {
+        background: #111827;
+        color: #9ca3af;
+    }
+
+    .archive-list th,
+    .archive-list td {
+        border-color: #374151;
+        color: #e5e7eb;
+    }
+
+    .archive-list td:nth-child(3) {
+        color: #9ca3af;
     }
 
     .code-line::before {
@@ -730,6 +838,7 @@ pre {
 
     .markdown-content code {
         background: #374151;
+        color: #e5e7eb;
     }
 
     .markdown-content pre {
@@ -746,9 +855,36 @@ pre {
         background: #374151;
     }
 
+    .org-content {
+        color: #e5e7eb;
+    }
+
     .org-content nav {
         background: #1f2937;
         border-color: #374151;
+    }
+
+    .org-content code.verbatim {
+        background: #374151;
+        color: #e5e7eb;
+    }
+
+    .org-content .src {
+        background: #111827;
+        border-color: #4b5563;
+    }
+
+    .org-content .src pre {
+        color: #e5e7eb;
+    }
+
+    .org-content table th,
+    .org-content table td {
+        border-color: #4b5563;
+    }
+
+    .org-content table th {
+        background: #374151;
     }
 
     .org-content .status-todo {
@@ -767,6 +903,7 @@ pre {
 
     .csv-list th {
         background: #374151;
+        color: #9ca3af;
     }
 
     .meta-label {

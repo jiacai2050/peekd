@@ -43,7 +43,7 @@ func mustNewHandler(t *testing.T, rootDir string, maxPreviewSize int64) http.Han
 	t.Helper()
 
 	handler, err := NewHandler(Config{
-		RootDir:            rootDir,
+		Roots:              []string{rootDir},
 		Addr:               ":0",
 		MaxTextPreviewSize: maxPreviewSize,
 		Version:            "test",
@@ -760,7 +760,7 @@ func TestNewHandlerRequiresMarkdownTemplate(t *testing.T) {
 	}
 
 	_, err := NewHandler(Config{
-		RootDir:            ".",
+		Roots:              []string{"."},
 		Addr:               ":0",
 		MaxTextPreviewSize: 4 << 20,
 		Version:            "test",
@@ -793,7 +793,7 @@ func TestNewHandlerRequiresOrgTemplate(t *testing.T) {
 	}
 
 	_, err := NewHandler(Config{
-		RootDir:            ".",
+		Roots:              []string{"."},
 		Addr:               ":0",
 		MaxTextPreviewSize: 4 << 20,
 		Version:            "test",
@@ -829,4 +829,244 @@ func TestOrgFileDefaultsToRaw(t *testing.T) {
 		t.Fatalf("non-browser response = %q, want %q", got, content)
 	}
 }
+
+func TestMultiRootResolutionAndIsolation(t *testing.T) {
+	tempDir := t.TempDir()
+	dirA := filepath.Join(tempDir, "dirA")
+	dirB := filepath.Join(tempDir, "dirB")
+	_ = os.Mkdir(dirA, 0o755)
+	_ = os.Mkdir(dirB, 0o755)
+
+	_ = os.WriteFile(filepath.Join(dirA, "file.txt"), []byte("content from A"), 0o600)
+	_ = os.WriteFile(filepath.Join(dirB, "file.txt"), []byte("content from B"), 0o600)
+
+	handler, err := NewHandler(Config{
+		Roots:              []string{dirA, dirB},
+		Addr:               ":0",
+		MaxTextPreviewSize: 4 << 20,
+		Version:            "test",
+		ProjectURL:         "https://example.com",
+		EmbeddedFiles:      testEmbeddedFiles,
+	})
+	if err != nil {
+		t.Fatalf("NewHandler error: %v", err)
+	}
+
+	// 1. Default root is index 0 (dirA)
+	req := httptest.NewRequest(http.MethodGet, "/file.txt?raw=1", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Body.String() != "content from A" {
+		t.Fatalf("expected content from A (default), got %q", rec.Body.String())
+	}
+
+	// 2. QueryString specifies root=1 (dirB)
+	req = httptest.NewRequest(http.MethodGet, "/file.txt?raw=1&root=1", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Body.String() != "content from B" {
+		t.Fatalf("expected content from B via query string, got %q", rec.Body.String())
+	}
+
+	// 3. Invalid QueryString safely falls back to default root 0 (dirA)
+	req = httptest.NewRequest(http.MethodGet, "/file.txt?raw=1&root=nonexistent", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Body.String() != "content from A" {
+		t.Fatalf("expected content from A when root nonexistent, got %q", rec.Body.String())
+	}
+
+	// 4. Multi-tab concurrency: concurrent requests with different roots do not cross-contaminate
+	for range 10 {
+		recA := httptest.NewRecorder()
+		recB := httptest.NewRecorder()
+		handler.ServeHTTP(recA, httptest.NewRequest(http.MethodGet, "/file.txt?raw=1&root=0", nil))
+		handler.ServeHTTP(recB, httptest.NewRequest(http.MethodGet, "/file.txt?raw=1&root=1", nil))
+		if recA.Body.String() != "content from A" {
+			t.Fatalf("tab A corrupted: got %q", recA.Body.String())
+		}
+		if recB.Body.String() != "content from B" {
+			t.Fatalf("tab B corrupted: got %q", recB.Body.String())
+		}
+	}
+
+	// 5. Directory listing: entries for non-default root carry ?root=1
+	req = httptest.NewRequest(http.MethodGet, "/?root=1", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "/file.txt?root=1") {
+		t.Fatalf("expected entry URL to contain ?root=1, got %q", rec.Body.String())
+	}
+
+	// 6. Directory listing: entries for default root do not carry ?root=
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "?root=") {
+		t.Fatalf("expected default root entries to not contain ?root=, got %q", rec.Body.String())
+	}
+
+	// 7. File preview does not contain root selector even in multi-root mode
+	req = httptest.NewRequest(http.MethodGet, "/file.txt", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), "switchRoot") {
+		t.Fatalf("expected no root selector in file preview under multi-root mode")
+	}
+
+	// 8. Directory ZIP download names the archive using the directory basename
+	req = httptest.NewRequest(http.MethodGet, "/?download=zip", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if disp := rec.Header().Get("Content-Disposition"); !strings.Contains(disp, `filename="dirA.zip"`) {
+		t.Fatalf("expected filename=\"dirA.zip\", got %q", disp)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/?download=zip&root=1", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if disp := rec.Header().Get("Content-Disposition"); !strings.Contains(disp, `filename="dirB.zip"`) {
+		t.Fatalf("expected filename=\"dirB.zip\", got %q", disp)
+	}
+}
+
+func TestSingleRootModeIsClean(t *testing.T) {
+	tempDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(tempDir, "hello.txt"), []byte("hello world"), 0o600)
+
+	handler := mustNewHandler(t, tempDir, 4<<20)
+
+	// 1. Directory page must not contain root selector
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, "switchRoot") {
+		t.Fatalf("expected no root selector in single-root mode, got it in body")
+	}
+
+	// 2. File preview must not contain root selector
+	req = httptest.NewRequest(http.MethodGet, "/hello.txt", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+	body = rec.Body.String()
+	if strings.Contains(body, "switchRoot") {
+		t.Fatalf("expected no root selector in file preview under single-root mode")
+	}
+}
+
+func TestResolveRoots(t *testing.T) {
+	tempDir := t.TempDir()
+	dirA := filepath.Join(tempDir, "dirA")
+	dirB := filepath.Join(tempDir, "dirB")
+	fileC := filepath.Join(tempDir, "fileC.txt")
+
+	if err := os.Mkdir(dirA, 0o755); err != nil {
+		t.Fatalf("mkdir dirA: %v", err)
+	}
+	if err := os.Mkdir(dirB, 0o755); err != nil {
+		t.Fatalf("mkdir dirB: %v", err)
+	}
+	if err := os.WriteFile(fileC, []byte("hello"), 0o644); err != nil {
+		t.Fatalf("write fileC: %v", err)
+	}
+
+	t.Run("default current directory when args is empty", func(t *testing.T) {
+		roots, err := resolveRoots(nil)
+		if err != nil {
+			t.Fatalf("resolveRoots(nil) error: %v", err)
+		}
+		if len(roots) != 1 {
+			t.Fatalf("expected 1 root, got %d", len(roots))
+		}
+		absCurrent, _ := filepath.Abs(".")
+		if roots[0].Path != absCurrent {
+			t.Errorf("expected path %s, got %s", absCurrent, roots[0].Path)
+		}
+		if !roots[0].IsDefault || roots[0].Index != 0 {
+			t.Errorf("expected default root index 0")
+		}
+	})
+
+	t.Run("single directory argument", func(t *testing.T) {
+		roots, err := resolveRoots([]string{dirA})
+		if err != nil {
+			t.Fatalf("resolveRoots error: %v", err)
+		}
+		if len(roots) != 1 {
+			t.Fatalf("expected 1 root, got %d", len(roots))
+		}
+		if roots[0].Name != "dirA" || roots[0].Path != dirA || !roots[0].IsDefault || roots[0].Index != 0 {
+			t.Errorf("unexpected root: %+v", roots[0])
+		}
+	})
+
+	t.Run("multiple directories: first is default with index 0", func(t *testing.T) {
+		roots, err := resolveRoots([]string{dirA, dirB})
+		if err != nil {
+			t.Fatalf("resolveRoots error: %v", err)
+		}
+		if len(roots) != 2 {
+			t.Fatalf("expected 2 roots, got %d", len(roots))
+		}
+		if roots[0].Name != "dirA" || roots[0].Path != dirA || !roots[0].IsDefault || roots[0].Index != 0 {
+			t.Errorf("unexpected root[0]: %+v", roots[0])
+		}
+		if roots[1].Name != "dirB" || roots[1].Path != dirB || roots[1].IsDefault || roots[1].Index != 1 {
+			t.Errorf("unexpected root[1]: %+v", roots[1])
+		}
+	})
+
+	t.Run("same directory base name supported via indexing", func(t *testing.T) {
+		subDirA := filepath.Join(dirA, "same")
+		subDirB := filepath.Join(dirB, "same")
+		_ = os.Mkdir(subDirA, 0o755)
+		_ = os.Mkdir(subDirB, 0o755)
+
+		roots, err := resolveRoots([]string{subDirA, subDirB})
+		if err != nil {
+			t.Fatalf("expected success with same base name: %v", err)
+		}
+		if len(roots) != 2 || roots[0].Index != 0 || roots[1].Index != 1 {
+			t.Fatalf("unexpected roots: %+v", roots)
+		}
+		if roots[0].Name != "same" || roots[1].Name != "same" {
+			t.Fatalf("expected basename 'same', got %q and %q", roots[0].Name, roots[1].Name)
+		}
+	})
+
+	t.Run("non-existent directory error", func(t *testing.T) {
+		_, err := resolveRoots([]string{filepath.Join(tempDir, "does-not-exist")})
+		if err == nil {
+			t.Fatal("expected error on non-existent directory, got nil")
+		}
+	})
+
+	t.Run("regular file as root error", func(t *testing.T) {
+		_, err := resolveRoots([]string{fileC})
+		if err == nil {
+			t.Fatal("expected error when path is a file, got nil")
+		}
+		if !strings.Contains(err.Error(), "not a directory") {
+			t.Fatalf("unexpected error message: %v", err)
+		}
+	})
+}
+
+
 

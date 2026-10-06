@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"runtime/debug"
 	"time"
 
@@ -58,18 +57,8 @@ func main() {
 		return
 	}
 
-	rootDir := "."
-	if flag.NArg() > 0 {
-		rootDir = flag.Arg(0)
-	}
-
-	absoluteRootDir, err := filepath.Abs(rootDir)
-	if err != nil {
-		log.Fatalf("failed to resolve root directory: %v", err)
-	}
-
 	if err := internal.Run(internal.Config{
-		RootDir:            absoluteRootDir,
+		Roots:              flag.Args(),
 		Addr:               *addr,
 		MaxTextPreviewSize: maxTextPreviewSize,
 		Version:            Version,

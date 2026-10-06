@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -80,8 +81,9 @@ type Breadcrumb struct {
 }
 
 type Config struct {
-	ProjectURL string
-	Version    string
+	ProjectURL  string
+	Version     string
+	CurrentRoot int
 }
 
 // PreviewCommon holds fields shared by every preview data struct.
@@ -96,6 +98,7 @@ type PreviewCommon struct {
 	LocalPath   string
 	ProjectURL  string
 	Version     string
+	CurrentRoot int
 }
 
 func FileIcon(path string, isDir bool) string {
@@ -130,17 +133,22 @@ func FileIcon(path string, isDir bool) string {
 }
 
 func newPreviewCommon(requestPath, filePath string, info os.FileInfo, config Config, extraMeta string) PreviewCommon {
+	rootParam := ""
+	if config.CurrentRoot > 0 {
+		rootParam = strconv.Itoa(config.CurrentRoot)
+	}
 	return PreviewCommon{
-		FileName:    previewFileName(filePath),
-		Icon:        FileIcon(filePath, info.IsDir()),
-		ExtraMeta:   extraMeta,
-		Size:        previewFileSize(info),
-		Modified:    previewModified(info),
-		RawURL:      previewRawURL(requestPath),
-		Breadcrumbs: Breadcrumbs(requestPath, false),
+		FileName:       previewFileName(filePath),
+		Icon:           FileIcon(filePath, info.IsDir()),
+		ExtraMeta:      extraMeta,
+		Size:           previewFileSize(info),
+		Modified:       previewModified(info),
+		RawURL:         previewRawURL(requestPath, rootParam),
+		Breadcrumbs:    Breadcrumbs(requestPath, false, rootParam),
 		LocalPath:   previewLocalPath(filePath),
 		ProjectURL:  config.ProjectURL,
 		Version:     config.Version,
+		CurrentRoot: config.CurrentRoot,
 	}
 }
 
@@ -149,8 +157,17 @@ func executeTemplate(w http.ResponseWriter, tmpl *template.Template, data any) e
 	return tmpl.Execute(w, data)
 }
 
-func Breadcrumbs(requestPath string, isDir bool) []Breadcrumb {
-	breadcrumbs := []Breadcrumb{{Name: "Peekd", URL: "/", Current: strings.Trim(requestPath, "/") == "" && isDir}}
+func Breadcrumbs(requestPath string, isDir bool, rootParam ...string) []Breadcrumb {
+	root := ""
+	if len(rootParam) > 0 {
+		root = rootParam[0]
+	}
+
+	peekdURL := "/"
+	if root != "" {
+		peekdURL = "/?root=" + url.QueryEscape(root)
+	}
+	breadcrumbs := []Breadcrumb{{Name: "Peekd", URL: peekdURL, Current: strings.Trim(requestPath, "/") == "" && isDir}}
 	parts := strings.Split(strings.Trim(requestPath, "/"), "/")
 	if len(parts) == 1 && parts[0] == "" {
 		return breadcrumbs
@@ -160,13 +177,17 @@ func Breadcrumbs(requestPath string, isDir bool) []Breadcrumb {
 	for index, part := range parts {
 		currentPath = path.Join(currentPath, part)
 		current := index == len(parts)-1
-		breadcrumbURL := (&url.URL{Path: currentPath}).String()
+		p := currentPath
 		if !current || isDir {
-			breadcrumbURL += "/"
+			p += "/"
+		}
+		u := &url.URL{Path: p}
+		if root != "" {
+			u.RawQuery = url.Values{"root": []string{root}}.Encode()
 		}
 		breadcrumbs = append(breadcrumbs, Breadcrumb{
 			Name:    part,
-			URL:     breadcrumbURL,
+			URL:     u.String(),
 			Current: current,
 		})
 	}
@@ -196,8 +217,12 @@ const (
 	PreviewTypeMOBI     PreviewType = "mobi"
 )
 
-func previewRawURL(requestPath string) string {
-	return (&url.URL{Path: requestPath, RawQuery: "raw=1"}).String()
+func previewRawURL(requestPath, rootParam string) string {
+	q := url.Values{"raw": []string{"1"}}
+	if rootParam != "" {
+		q.Set("root", rootParam)
+	}
+	return (&url.URL{Path: requestPath, RawQuery: q.Encode()}).String()
 }
 
 func previewFileName(filePath string) string {

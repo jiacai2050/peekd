@@ -32,7 +32,7 @@ root directory, reads `PEEKD_AUTH_USER` and `PEEKD_AUTH_PASSWORD`, embeds
 `internal.NewHandler` builds the HTTP handler and parses every embedded HTML
 template. It mounts embedded CSS and templates under `/__peekd_assets/`,
 handles directory rendering, and routes file requests. The request path is
-mapped beneath `Config.RootDir`; directories render an index page, while
+mapped beneath the target root from `Config.Roots`; directories render an index page, while
 files either use the direct `http.FileServer` path or a browser document
 preview.
 

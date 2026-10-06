@@ -27,8 +27,16 @@ import (
 	"github.com/jiacai2050/peekd/internal/preview"
 )
 
+// Root represents a mount point mapping an index to a local filesystem directory.
+type Root struct {
+	Index     int
+	Name      string
+	Path      string
+	IsDefault bool
+}
+
 type Config struct {
-	RootDir            string
+	Roots              []string
 	Addr               string
 	MaxTextPreviewSize int64
 	Version            string
@@ -36,6 +44,35 @@ type Config struct {
 	EmbeddedFiles      fs.FS
 	AuthUsername       string
 	AuthPassword       string
+}
+
+func resolveRoots(rawDirs []string) ([]Root, error) {
+	if len(rawDirs) == 0 {
+		rawDirs = []string{"."}
+	}
+
+	roots := make([]Root, len(rawDirs))
+	for i, rawDir := range rawDirs {
+		absPath, err := filepath.Abs(rawDir)
+		if err != nil {
+			return nil, fmt.Errorf("invalid path %q: %w", rawDir, err)
+		}
+		info, err := os.Stat(absPath)
+		if err != nil {
+			return nil, fmt.Errorf("invalid path %q: %w", rawDir, err)
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("path %q is not a directory", rawDir)
+		}
+		roots[i] = Root{
+			Index:     i,
+			Name:      filepath.Base(absPath),
+			Path:      absPath,
+			IsDefault: i == 0,
+		}
+	}
+
+	return roots, nil
 }
 
 type directoryEntry struct {
@@ -50,12 +87,14 @@ type directoryEntry struct {
 }
 
 type directoryData struct {
-	HasParent   bool
-	Entries     []directoryEntry
-	Breadcrumbs []preview.Breadcrumb
-	LocalPath   string
-	ProjectURL  string
-	Version     string
+	HasParent      bool
+	Entries        []directoryEntry
+	Breadcrumbs    []preview.Breadcrumb
+	LocalPath      string
+	ProjectURL     string
+	Version        string
+	AvailableRoots []Root
+	CurrentRoot    int
 }
 
 func detectContentType(filePath string) (string, error) {
@@ -150,12 +189,16 @@ func ParseByteSize(value string) (int64, error) {
 	return int64(size), nil
 }
 
-func directoryEntryURL(requestPath, name string, isDir bool) string {
+func directoryEntryURL(requestPath, name string, isDir bool, rootParam string) string {
 	entryPath := path.Join(requestPath, name)
 	if isDir {
 		entryPath += "/"
 	}
-	return (&url.URL{Path: entryPath}).String()
+	u := &url.URL{Path: entryPath}
+	if rootParam != "" {
+		u.RawQuery = url.Values{"root": []string{rootParam}}.Encode()
+	}
+	return u.String()
 }
 
 func setCacheHeaders(w http.ResponseWriter, info os.FileInfo, path, version string) {
@@ -217,23 +260,19 @@ func validateCache(w http.ResponseWriter, r *http.Request, info os.FileInfo, ver
 	return false
 }
 
-func serveDirectoryZip(w http.ResponseWriter, r *http.Request, rootDir, requestPath string) {
-	dirName := filepath.Base(requestPath)
-	if dirName == "." || dirName == "/" {
-		dirName = "directory"
-	}
+func serveDirectoryZip(w http.ResponseWriter, r *http.Request, dirPath string) {
+	dirName := filepath.Base(dirPath)
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.zip"`, dirName))
 
-	basePath := filepath.Join(rootDir, filepath.FromSlash(requestPath))
 	zipWriter := zip.NewWriter(w)
 	defer zipWriter.Close()
 
-	filepath.Walk(basePath, func(filePath string, info os.FileInfo, err error) error {
+	filepath.Walk(dirPath, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // skip inaccessible entries
 		}
-		relPath, err := filepath.Rel(basePath, filePath)
+		relPath, err := filepath.Rel(dirPath, filePath)
 		if err != nil {
 			return nil
 		}
@@ -266,20 +305,27 @@ func serveDirectoryZip(w http.ResponseWriter, r *http.Request, rootDir, requestP
 	})
 }
 
-func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPath string, tmpl *template.Template, projectURL string, version string) {
-	fullPath := filepath.Join(rootDir, filepath.FromSlash(requestPath))
+func renderDirectory(w http.ResponseWriter, r *http.Request, root Root, requestPath string, tmpl *template.Template, projectURL, version string, availableRoots []Root, currentRoot int) {
+	fullPath := filepath.Join(root.Path, filepath.FromSlash(requestPath))
 	entries, err := os.ReadDir(fullPath)
 	if err != nil {
 		http.Error(w, "unable to read directory", http.StatusInternalServerError)
 		return
 	}
 
+	rootParam := ""
+	if currentRoot > 0 {
+		rootParam = strconv.Itoa(currentRoot)
+	}
+
 	data := directoryData{
-		HasParent:   requestPath != "/",
-		ProjectURL:  projectURL,
-		Version:     version,
-		Breadcrumbs: preview.Breadcrumbs(requestPath, true),
-		LocalPath:   filepath.Clean(fullPath),
+		HasParent:      requestPath != "/",
+		ProjectURL:     projectURL,
+		Version:        version,
+		Breadcrumbs:    preview.Breadcrumbs(requestPath, true, rootParam),
+		LocalPath:      filepath.Clean(fullPath),
+		AvailableRoots: availableRoots,
+		CurrentRoot:    currentRoot,
 	}
 
 	for _, entry := range entries {
@@ -295,7 +341,7 @@ func renderDirectory(w http.ResponseWriter, r *http.Request, rootDir, requestPat
 		}
 		data.Entries = append(data.Entries, directoryEntry{
 			Name:         entry.Name(),
-			URL:          directoryEntryURL(requestPath, entry.Name(), entry.IsDir()),
+			URL:          directoryEntryURL(requestPath, entry.Name(), entry.IsDir(), rootParam),
 			Icon:         preview.FileIcon(entry.Name(), entry.IsDir()),
 			FileModeBits: info.Mode().String(),
 			Size:         size,
@@ -445,11 +491,11 @@ func NewHandler(config Config) (http.Handler, error) {
 		return nil, fmt.Errorf("failed to access embedded subdirectory: %w", err)
 	}
 
-	fileServer := http.FileServer(http.Dir(config.RootDir))
-	previewConfig := preview.Config{
-		ProjectURL: config.ProjectURL,
-		Version:    config.Version,
+	roots, err := resolveRoots(config.Roots)
+	if err != nil {
+		return nil, err
 	}
+
 	assetServer := http.StripPrefix("/__peekd_assets/", http.FileServer(http.FS(assetsFS)))
 	mux := http.NewServeMux()
 	mux.Handle("/__peekd_assets/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -460,13 +506,34 @@ func NewHandler(config Config) (http.Handler, error) {
 		}
 		assetServer.ServeHTTP(w, r)
 	}))
+
+	var availableRoots []Root
+	if len(roots) > 1 {
+		availableRoots = roots
+	}
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		targetIndex := 0
+		if rootStr := r.URL.Query().Get("root"); rootStr != "" {
+			if idx, err := strconv.Atoi(rootStr); err == nil && idx >= 0 && idx < len(roots) {
+				targetIndex = idx
+			}
+		}
+		targetRoot := roots[targetIndex]
+
 		cleanedPath := filepath.Clean(r.URL.Path)
-		fullPath := filepath.Join(config.RootDir, cleanedPath)
+		fullPath := filepath.Join(targetRoot.Path, filepath.FromSlash(cleanedPath))
+
+		// Security: prevent path traversal outside the target root directory
+		rel, relErr := filepath.Rel(targetRoot.Path, fullPath)
+		if relErr != nil || strings.HasPrefix(rel, "..") {
+			http.NotFound(w, r)
+			return
+		}
 
 		info, err := os.Stat(fullPath)
 		if err != nil {
-			if os.IsNotExist(err) {
+			if errors.Is(err, fs.ErrNotExist) {
 				http.NotFound(w, r)
 			} else {
 				http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -477,17 +544,24 @@ func NewHandler(config Config) (http.Handler, error) {
 		if validateCache(w, r, info, config.Version) {
 			return
 		}
+
 		if info.IsDir() {
 			if r.URL.Query().Get("download") == "zip" {
-				serveDirectoryZip(w, r, config.RootDir, cleanedPath)
+				serveDirectoryZip(w, r, fullPath)
 				return
 			}
-			renderDirectory(w, r, config.RootDir, cleanedPath, directoryTemplate, config.ProjectURL, config.Version)
+			renderDirectory(w, r, targetRoot, cleanedPath, directoryTemplate, config.ProjectURL, config.Version, availableRoots, targetIndex)
 			return
 		}
 
+		previewConfig := preview.Config{
+			ProjectURL:  config.ProjectURL,
+			Version:     config.Version,
+			CurrentRoot: targetIndex,
+		}
+
 		if r.URL.Query().Get("raw") == "1" || !isDocumentRequest(r) {
-			fileServer.ServeHTTP(w, r)
+			http.ServeFile(w, r, fullPath)
 			return
 		}
 
@@ -507,7 +581,7 @@ func NewHandler(config Config) (http.Handler, error) {
 			return
 		}
 		if preparedPreviewType == preview.PreviewTypeNone {
-			fileServer.ServeHTTP(w, r)
+			http.ServeFile(w, r, fullPath)
 			return
 		}
 		previewKind = preparedPreviewType
@@ -530,7 +604,7 @@ func NewHandler(config Config) (http.Handler, error) {
 
 		case preview.PreviewTypeZIP, preview.PreviewTypeTAR, preview.PreviewTypeTARGZ:
 			if err := preview.RenderArchivePreview(w, archiveTemplate, r.URL.Path, fullPath, info, previewConfig); err != nil {
-				fileServer.ServeHTTP(w, r)
+				http.ServeFile(w, r, fullPath)
 			}
 
 		case preview.PreviewTypeHTML:
@@ -578,7 +652,7 @@ func NewHandler(config Config) (http.Handler, error) {
 			}
 
 		default:
-			fileServer.ServeHTTP(w, r)
+			http.ServeFile(w, r, fullPath)
 		}
 	})
 
@@ -592,6 +666,11 @@ func NewHandler(config Config) (http.Handler, error) {
 }
 
 func Run(config Config) error {
+	roots, err := resolveRoots(config.Roots)
+	if err != nil {
+		return err
+	}
+
 	handler, err := NewHandler(config)
 	if err != nil {
 		return err
@@ -603,7 +682,18 @@ func Run(config Config) error {
 	}
 	defer listener.Close()
 
-	log.Printf("serving %s", config.RootDir)
+	if len(roots) == 1 {
+		log.Printf("serving %s", roots[0].Path)
+	} else {
+		log.Printf("serving %d roots:", len(roots))
+		for _, r := range roots {
+			def := ""
+			if r.IsDefault {
+				def = " [default]"
+			}
+			log.Printf("  [%d] %s: %s%s", r.Index, r.Name, r.Path, def)
+		}
+	}
 	printServerAddresses(listener.Addr())
 	return http.Serve(listener, handler)
 }

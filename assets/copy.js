@@ -43,4 +43,13 @@
             copyPath(button);
         });
     });
+
+    window.switchRoot = function (index) {
+        var nextURL = new URL("/", window.location.origin);
+        if (index && index !== "0") {
+            nextURL.searchParams.set("root", index);
+        }
+        window.location.href = nextURL.toString();
+    };
 }());
+

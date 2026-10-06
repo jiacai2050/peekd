@@ -57,6 +57,17 @@ Serve another directory:
 peekd ~/Downloads -addr :9000
 ```
 
+Serve multiple directories:
+
+```bash
+# First directory is the default root
+peekd ~/Downloads ~/Work/project -addr :9000
+```
+
+- **Multi-Root navigation**: When multiple directories are served, switch roots from the directory header selector or use `?root=<index>` (e.g. `/README.md?root=1`).
+- **Multi-Tab isolation**: Each browser tab operates completely independently via URL query strings without cookies cross-polluting sessions.
+- **Default root**: The first directory passed on the command line is index 0 (default root); requests to it do not need `?root=`.
+
 If the selected port is occupied, Peekd tries the next port automatically.
 
 Peekd uses the browser `Sec-Fetch-Dest` header to distinguish document

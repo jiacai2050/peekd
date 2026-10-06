@@ -22,7 +22,7 @@
             </div>
             <div class="header-actions">
                 <button class="download-button copy-button" type="button" data-copy-path="{{.LocalPath}}">Copy local path</button>
-                <a class="download-button" href="./">Back to directory</a>
+                <a class="download-button" href="./{{if .CurrentRoot}}?root={{.CurrentRoot}}{{end}}">Back to directory</a>
                 <a class="download-button" href="{{.RawURL}}" download>Download original</a>
             </div>
         </div>{{end}}
