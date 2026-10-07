@@ -97,7 +97,7 @@ func makePreview(request previewRequest) previewResponse {
 		Size: preview.FormatFileSize(request.Size),
 	}
 	if request.LastModified > 0 {
-		response.Modified = time.UnixMilli(request.LastModified).Format("2006-01-02 15:04:05")
+		response.Modified = time.UnixMilli(request.LastModified).Format("2006-01-02 15:04:05 -07:00")
 	}
 
 	kind := preview.PreviewTypeByExtension(request.Name)

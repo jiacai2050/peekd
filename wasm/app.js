@@ -186,7 +186,7 @@ function parseFile(file) {
       kind: directKind,
       name: displayName(file),
       size: formatFileSize(file.size),
-      modified: file.lastModified ? new Date(file.lastModified).toISOString().slice(0, 19).replace("T", " ") : "",
+      modified: file.lastModified ? formatModified(file.lastModified) : "",
     });
   }
   const id = ++state.requestID;
@@ -226,6 +226,18 @@ function formatFileSize(size) {
     unit++;
   }
   return `${value.toFixed(1)} ${units[unit]}`;
+}
+
+function formatModified(timestamp) {
+  const date = new Date(timestamp);
+  const pad = (value) => String(value).padStart(2, "0");
+  const offset = -date.getTimezoneOffset();
+  const sign = offset >= 0 ? "+" : "-";
+  const hours = Math.floor(Math.abs(offset) / 60);
+  const minutes = Math.abs(offset) % 60;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())} ` +
+    `${sign}${pad(hours)}:${pad(minutes)}`;
 }
 
 function renderPreview(file, result) {
