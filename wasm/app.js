@@ -1,5 +1,6 @@
 const state = {
   files: new Map(),
+  labels: new WeakMap(),
   current: null,
   requestID: 0,
   worker: null,
@@ -25,11 +26,23 @@ function setStatus(message, isError = false) {
 }
 
 function displayName(file) {
-  return file._peekdPath || file.webkitRelativePath || file.name;
+  return state.labels.get(file) || file._peekdPath || file.webkitRelativePath || file.name;
 }
 
 function addFiles(files) {
-  for (const file of files) state.files.set(displayName(file), file);
+  for (const file of files) {
+    const originalName = file._peekdPath || file.webkitRelativePath || file.name;
+    const extensionIndex = originalName.lastIndexOf(".");
+    const extension = extensionIndex > 0 ? originalName.slice(extensionIndex) : "";
+    const stem = extension ? originalName.slice(0, extensionIndex) : originalName;
+    let name = originalName;
+    let suffix = 2;
+    while (state.files.has(name) && state.files.get(name) !== file) {
+      name = `${stem} (${suffix++})${extension}`;
+    }
+    state.labels.set(file, name);
+    state.files.set(name, file);
+  }
   renderFileList();
   if (!state.current && state.files.size) selectFile([...state.files.values()][0]);
 }
