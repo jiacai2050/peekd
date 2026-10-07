@@ -1,20 +1,25 @@
-# Peekd Local WASM
+# Peekd Local
 
-This is the browser-local version of Peekd. Files are read through the browser
-File API and parsed locally; they are not uploaded to a Peekd server.
+Peekd Local runs entirely in your browser. Open files or directories, drag
+files onto the page, or enter a remote file URL to preview them without
+uploading local files to a server.
 
-Build it with Go 1.26:
+Try it online: <https://jiacai2050.github.io/peekd/wasm/>.
+
+Supported previews include text and code, Markdown, Org, JSON, XML, CSV/TSV,
+images, audio/video, PDF, and ZIP/TAR archive listings.
+
+## Run locally
+
+Build it with:
 
 ```sh
 ./build.sh
 python3 -m http.server 8091
 ```
 
-Open <http://127.0.0.1:8091/>. Browsers block the WASM worker when this page is
-opened directly as `file://`.
+Open <http://127.0.0.1:8091/>. The page must be served over HTTP; opening
+`index.html` directly as `file://` will not start the WASM worker.
 
-The build copies the version-matched `wasm_exec.js` from the Go toolchain and
-creates `peekd.wasm`; both generated files are ignored by Git. The browser
-entry point owns file selection, directory permissions, media/blob handling,
-and the UI. Go WASM owns format detection, text formatting, Markdown/Org
-rendering, CSV/TSV parsing, and archive listing.
+Remote URLs must be accessible through browser CORS. Files selected from your
+computer stay in the browser and are processed locally.
