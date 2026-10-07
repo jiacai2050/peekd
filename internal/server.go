@@ -115,29 +115,6 @@ func detectContentType(filePath string) (string, error) {
 	return http.DetectContentType(buffer[:n]), nil
 }
 
-func previewTypeByContent(contentType string) preview.PreviewType {
-	switch {
-	case strings.HasPrefix(contentType, "image/"):
-		return preview.PreviewTypeImage
-	case strings.HasPrefix(contentType, "audio/"):
-		return preview.PreviewTypeAudio
-	case strings.HasPrefix(contentType, "video/"):
-		return preview.PreviewTypeVideo
-	case contentType == "application/pdf":
-		return preview.PreviewTypePDF
-	case contentType == "application/zip":
-		return preview.PreviewTypeZIP
-	case contentType == "application/x-tar":
-		return preview.PreviewTypeTAR
-	case contentType == "application/json":
-		return preview.PreviewTypeJSON
-	case strings.HasPrefix(contentType, "text/"):
-		return preview.PreviewTypeText
-	default:
-		return preview.PreviewTypeNone
-	}
-}
-
 func isDocumentRequest(r *http.Request) bool {
 	dest := r.Header.Get("Sec-Fetch-Dest")
 	if dest == "document" {
@@ -572,7 +549,7 @@ func NewHandler(config Config) (http.Handler, error) {
 				http.Error(w, "unable to inspect file", http.StatusInternalServerError)
 				return
 			}
-			previewKind = previewTypeByContent(contentType)
+			previewKind = preview.PreviewTypeByContent(contentType)
 		}
 
 		prepared, preparedPreviewType, prepareErr := preview.PrepareTextPreview(previewKind, fullPath, info.Size(), config.MaxTextPreviewSize)

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Peekd local browser file previewer">
+  <title>Peekd Local</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <h1>Peekd Local</h1>
+      <p>Preview files in your browser. Files are never uploaded.</p>
+    </div>
+    <div class="toolbar">
+      <div class="primary-actions">
+        <button id="open-file" type="button">Open files</button>
+        <button id="open-directory" type="button">Open directory</button>
+        <form id="url-form" class="url-form">
+          <label class="sr-only" for="url-input">File URL</label>
+          <input id="url-input" type="url" placeholder="https://example.com/file.md" spellcheck="false">
+        </form>
+      </div>
+      <input id="file-input" type="file" multiple hidden>
+      <input id="directory-input" type="file" webkitdirectory multiple hidden>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="sidebar" aria-label="Files">
+      <div class="sidebar-heading">
+        <strong id="file-count">No files</strong>
+        <button id="clear-files" class="quiet" type="button">Clear</button>
+      </div>
+      <label class="sidebar-filter">
+        <span class="sr-only">Filter files</span>
+        <input id="filter" type="search" placeholder="Filter files…" autocomplete="off">
+      </label>
+      <div id="file-list" class="file-list">
+        <div class="empty-state">
+          <strong>Open a file or directory</strong>
+          <span>Everything stays local to this browser.</span>
+        </div>
+      </div>
+    </aside>
+    <section id="preview" class="preview" aria-live="polite">
+      <div class="empty-state large">
+        <strong>Select a file to preview</strong>
+        <span>Text, Markdown, JSON, CSV, images, media, PDF, and archives are supported.</span>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <span>Peekd Local · WASM</span>
+    <a href="https://github.com/jiacai2050/peekd" target="_blank" rel="noreferrer">GitHub</a>
+    <span id="status">Starting parser…</span>
+  </footer>
+  <script src="app.js"></script>
+</body>
+</html>

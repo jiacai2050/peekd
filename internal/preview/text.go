@@ -85,6 +85,23 @@ func PrepareTextPreview(preview PreviewType, filePath string, fileSize, maxSize 
 	return prepared, preview, nil
 }
 
+// PrepareBytesPreview formats an in-memory file using the same rules as the
+// server-side text preview. It is used by the browser WASM client.
+func PrepareBytesPreview(preview PreviewType, content []byte, maxSize int64) (PreparedTextPreview, PreviewType, error) {
+	if !previewNeedsContent(preview) {
+		return PreparedTextPreview{}, preview, nil
+	}
+	if int64(len(content)) > maxSize || !utf8.Valid(content) {
+		return PreparedTextPreview{}, PreviewTypeNone, nil
+	}
+
+	prepared, err := formatPreviewContent(preview, content)
+	if err != nil {
+		return PreparedTextPreview{Formatted: string(content)}, PreviewTypeText, nil
+	}
+	return prepared, preview, nil
+}
+
 func previewNeedsContent(preview PreviewType) bool {
 	switch preview {
 	case PreviewTypeHTML, PreviewTypeCSV, PreviewTypeTSV, PreviewTypeJSON, PreviewTypeXML, PreviewTypeText, PreviewTypeCode, PreviewTypeMarkdown, PreviewTypeOrg:

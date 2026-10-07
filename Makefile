@@ -9,6 +9,14 @@ run:
 build:
 	go build -ldflags "-X main.Version=$(VERSION)" -o $(APP) .
 
+wasm-build:
+	sh wasm/build.sh
+
+pages-build: wasm-build
+	mkdir -p public/wasm
+	cp -R docs/. public/
+	cp wasm/index.html wasm/app.js wasm/worker.js wasm/styles.css wasm/peekd.wasm wasm/wasm_exec.js public/wasm/
+
 test:
 	go test -v ./...
 
@@ -40,4 +48,4 @@ webp:
 	fd -t f $(EXCLUDE) --full-path './docs/images' --exec convert {} {.}.webp \;
 	fd -t f $(EXCLUDE) --full-path './docs/images' --exec rm {} \;
 
-.PHONY: build test run fmt fmt-check vet check webp
+.PHONY: build wasm-build pages-build test run fmt fmt-check vet check webp

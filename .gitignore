@@ -1,1 +1,4 @@
 peekd
+wasm/peekd.wasm
+wasm/wasm_exec.js
+public/

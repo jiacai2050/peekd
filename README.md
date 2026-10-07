@@ -114,6 +114,35 @@ download with:
 curl -C - -O http://127.0.0.1:8090/large-file.iso
 ```
 
+## Browser-local WASM previewer
+
+Peekd also includes a browser-local build that previews selected files without
+uploading them to a server. It supports files and directories, drag-and-drop,
+text/code, Markdown, Org, JSON, XML, CSV/TSV, images, audio/video, PDF, and
+ZIP/TAR archive listings.
+
+Build and serve it over HTTP:
+
+```bash
+make wasm-build
+cd wasm
+python3 -m http.server 8091
+```
+
+Open <http://127.0.0.1:8091/>. The browser handles file permissions and media
+playback; the Go WASM parser handles the format-specific previews. The
+generated `wasm/peekd.wasm` and `wasm/wasm_exec.js` files are build artifacts.
+The page also accepts a remote file URL. The remote server must allow browser
+CORS requests; the file is fetched into the browser and then parsed locally.
+
+The GitHub Pages workflow copies the site into `public/` and adds the generated
+WASM files under `public/wasm/`. To build the same publish directory locally,
+run:
+
+```bash
+make pages-build
+```
+
 ## Directory download
 
 Any directory can be downloaded as a ZIP archive. Click the **↓ ZIP** button in
