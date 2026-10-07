@@ -74,6 +74,30 @@ func PreviewTypeByExtension(filePath string) PreviewType {
 	}
 }
 
+// PreviewTypeByContent maps a detected MIME type to a preview type.
+func PreviewTypeByContent(contentType string) PreviewType {
+	switch {
+	case strings.HasPrefix(contentType, "image/"):
+		return PreviewTypeImage
+	case strings.HasPrefix(contentType, "audio/"):
+		return PreviewTypeAudio
+	case strings.HasPrefix(contentType, "video/"):
+		return PreviewTypeVideo
+	case contentType == "application/pdf":
+		return PreviewTypePDF
+	case contentType == "application/zip":
+		return PreviewTypeZIP
+	case contentType == "application/x-tar":
+		return PreviewTypeTAR
+	case contentType == "application/json":
+		return PreviewTypeJSON
+	case strings.HasPrefix(contentType, "text/"):
+		return PreviewTypeText
+	default:
+		return PreviewTypeNone
+	}
+}
+
 type Breadcrumb struct {
 	Name    string
 	URL     string
