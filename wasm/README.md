@@ -22,4 +22,6 @@ Open <http://127.0.0.1:8091/>. The page must be served over HTTP; opening
 `index.html` directly as `file://` will not start the WASM worker.
 
 Remote URLs must be accessible through browser CORS. Files selected from your
-computer stay in the browser and are processed locally.
+computer stay on your computer and are processed locally. Recent URLs and files
+can be restored after a refresh using browser storage. The browser may ask for
+permission again, and Clear removes the saved history.

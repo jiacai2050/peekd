@@ -1,12 +1,15 @@
 const state = {
   files: new Map(),
   labels: new WeakMap(),
+  fileSources: new WeakMap(),
   current: null,
   requestID: 0,
   worker: null,
   pending: new Map(),
   objectURL: null,
   mermaidPromise: null,
+  parser: {phase: "loading", error: null},
+  source: {phase: "idle", token: 0},
 };
 
 const $ = (id) => document.getElementById(id);
@@ -18,6 +21,104 @@ const filter = $("filter");
 const urlInput = $("url-input");
 const maxRemoteFileSize = 128 * 1024 * 1024;
 const maxPreviewBytes = 512 * 1024 + 1;
+const sourceStoreName = "sources";
+let databasePromise;
+let storageQueue = Promise.resolve();
+
+function beginSourceOperation(phase) {
+  state.source = {phase, token: state.source.token + 1};
+  return state.source.token;
+}
+
+function sourceOperationCurrent(token) {
+  return state.source.token === token;
+}
+
+function finishSourceOperation(token) {
+  if (sourceOperationCurrent(token)) state.source.phase = "idle";
+}
+
+function enqueueStorageTask(task) {
+  const next = storageQueue.then(task, task);
+  storageQueue = next.catch(() => {});
+  return next;
+}
+
+function openDatabase() {
+  if (databasePromise) return databasePromise;
+  databasePromise = new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("IndexedDB is unavailable."));
+      return;
+    }
+    const request = indexedDB.open("peekd-local", 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(sourceStoreName, {keyPath: "key"});
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Unable to open local storage."));
+  });
+  return databasePromise;
+}
+
+async function deleteSavedSourceNow(key) {
+  const database = await openDatabase();
+  const transaction = database.transaction(sourceStoreName, "readwrite");
+  transaction.objectStore(sourceStoreName).delete(key);
+  await new Promise((resolve, reject) => {
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error || new Error("Unable to remove saved source."));
+  });
+}
+
+function databaseRequest(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Local storage request failed."));
+  });
+}
+
+async function saveSource(source) {
+  const database = await openDatabase();
+  const transaction = database.transaction(sourceStoreName, "readwrite");
+  transaction.objectStore(sourceStoreName).put({...source, updatedAt: Date.now()});
+  await new Promise((resolve, reject) => {
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error || new Error("Unable to save source."));
+  });
+}
+
+async function saveSourceBestEffort(source) {
+  const token = state.source.token;
+  try {
+    await enqueueStorageTask(async () => {
+      if (!sourceOperationCurrent(token)) return;
+      await saveSource(source);
+    });
+  } catch (error) {
+    setStatus(`Unable to save ${source.name || "source"} for later: ${error.message}`, true);
+  }
+}
+
+function deleteSavedSource(key) {
+  return enqueueStorageTask(() => deleteSavedSourceNow(key));
+}
+
+async function listSources() {
+  const database = await openDatabase();
+  const transaction = database.transaction(sourceStoreName, "readonly");
+  return databaseRequest(transaction.objectStore(sourceStoreName).getAll());
+}
+
+async function clearSavedSources() {
+  const database = await openDatabase();
+  const transaction = database.transaction(sourceStoreName, "readwrite");
+  transaction.objectStore(sourceStoreName).clear();
+  await new Promise((resolve, reject) => {
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error || new Error("Unable to clear saved sources."));
+  });
+}
 
 function setStatus(message, isError = false) {
   const status = $("status");
@@ -25,11 +126,18 @@ function setStatus(message, isError = false) {
   status.classList.toggle("error", isError);
 }
 
+function failWorker(error) {
+  state.parser = {phase: "failed", error};
+  for (const pending of state.pending.values()) pending.reject(error);
+  state.pending.clear();
+  setStatus(error.message, true);
+}
+
 function displayName(file) {
   return state.labels.get(file) || file._peekdPath || file.webkitRelativePath || file.name;
 }
 
-function addFiles(files) {
+function addFiles(files, selectFirst = false) {
   for (const file of files) {
     const originalName = file._peekdPath || file.webkitRelativePath || file.name;
     const extensionIndex = originalName.lastIndexOf(".");
@@ -45,6 +153,7 @@ function addFiles(files) {
   }
   renderFileList();
   if (!state.current && state.files.size) selectFile([...state.files.values()][0]);
+  else if (selectFirst && files.length) selectFile(files[0]);
 }
 
 function remoteFileName(url, contentDisposition) {
@@ -57,7 +166,7 @@ function remoteFileName(url, contentDisposition) {
   return name || "remote-file";
 }
 
-async function loadURL(url) {
+async function loadURL(url, {persist = true, isCurrent = () => true} = {}) {
   let parsed;
   try {
     parsed = new URL(url);
@@ -84,13 +193,18 @@ async function loadURL(url) {
   if (blob.size > maxRemoteFileSize) {
     throw new Error("Remote file is larger than the 128 MiB browser limit.");
   }
+  if (!isCurrent()) return false;
   const file = new File([blob], remoteFileName(parsed.href, response.headers.get("content-disposition")), {
     type: response.headers.get("content-type")?.split(";")[0] || blob.type,
     lastModified: Date.now(),
   });
+  const source = {key: `url:${parsed.href}`, kind: "url", url: parsed.href, name: file.name};
+  state.fileSources.set(file, source);
+  if (persist) await saveSourceBestEffort(source);
+  if (!isCurrent()) return false;
   addFiles([file]);
-  selectFile(file);
-  setStatus("Ready");
+  if (await selectFile(file)) setStatus("Ready");
+  return true;
 }
 
 function renderFileList() {
@@ -108,21 +222,68 @@ function renderFileList() {
     return;
   }
   for (const [name, file] of files) {
-    const button = document.createElement("button");
-    button.className = "file-row";
-    button.classList.toggle("selected", state.current === file);
-    button.type = "button";
-    button.title = name;
+    const row = document.createElement("div");
+    row.className = "file-row";
+    row.classList.toggle("selected", state.current === file);
+    row.setAttribute("role", "button");
+    row.tabIndex = 0;
+    row.title = name;
     const icon = document.createElement("span");
     icon.className = "file-icon";
     icon.textContent = iconFor(file.name);
     const label = document.createElement("span");
     label.className = "file-name";
     label.textContent = name;
-    button.append(icon, label);
-    button.addEventListener("click", () => selectFile(file));
-    fileList.append(button);
+    const remove = document.createElement("button");
+    remove.className = "file-remove";
+    remove.type = "button";
+    remove.title = `Remove ${name}`;
+    remove.setAttribute("aria-label", `Remove ${name}`);
+    remove.textContent = "×";
+    remove.addEventListener("click", (event) => {
+      event.stopPropagation();
+      removeFile(file);
+    });
+    remove.addEventListener("keydown", (event) => event.stopPropagation());
+    row.append(icon, label, remove);
+    row.addEventListener("click", () => selectFile(file));
+    row.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectFile(file);
+      }
+    });
+    fileList.append(row);
   }
+}
+
+function removeFile(file) {
+  const token = beginSourceOperation("loading");
+  for (const [name, item] of state.files) {
+    if (item === file) state.files.delete(name);
+  }
+  const source = state.fileSources.get(file);
+  state.fileSources.delete(file);
+  state.labels.delete(file);
+  if (source && source.kind !== "directory") {
+    deleteSavedSource(source.key)
+      .catch((error) => setStatus(error.message, true))
+      .finally(() => finishSourceOperation(token));
+  } else if (source) {
+    source.excludedPaths = [...new Set([...(source.excludedPaths || []), file._peekdPath || file.name])];
+    saveSourceBestEffort(source).finally(() => finishSourceOperation(token));
+  } else {
+    finishSourceOperation(token);
+  }
+  if (state.current === file) {
+    state.current = null;
+    if (state.objectURL) {
+      URL.revokeObjectURL(state.objectURL);
+      state.objectURL = null;
+    }
+    preview.replaceChildren(message("Select a file to preview"));
+  }
+  renderFileList();
 }
 
 function iconFor(name) {
@@ -165,10 +326,13 @@ function isArchive(file) {
 
 function startWorker() {
   state.worker = new Worker("worker.js");
+  state.parser = {phase: "loading", error: null};
   state.worker.addEventListener("message", (event) => {
     const message = event.data;
     if (message.type === "ready") {
+      state.parser = {phase: "ready", error: null};
       setStatus("Ready");
+      if (state.current) void selectFile(state.current);
       return;
     }
     if (message.type === "error") {
@@ -180,6 +344,7 @@ function startWorker() {
           pending.reject(new Error(message.error));
         }
       }
+      if (!message.id) failWorker(new Error(message.error));
       return;
     }
     const pending = state.pending.get(message.id);
@@ -188,11 +353,15 @@ function startWorker() {
     pending.resolve(JSON.parse(message.result));
   });
   setStatus("Loading parser…");
-  state.worker.addEventListener("error", (event) => setStatus(event.message || "Parser worker failed", true));
+  state.worker.addEventListener("error", (event) => {
+    failWorker(new Error(event.message || "Parser worker failed"));
+  });
+  state.worker.addEventListener("messageerror", () => {
+    failWorker(new Error("Parser worker communication failed"));
+  });
 }
 
 function parseFile(file) {
-  if (!state.worker) return Promise.reject(new Error("Parser is not ready"));
   const directKind = directPreviewKind(file);
   if (directKind) {
     return Promise.resolve({
@@ -202,17 +371,31 @@ function parseFile(file) {
       modified: file.lastModified ? formatModified(file.lastModified) : "",
     });
   }
+  if (!state.worker) return Promise.reject(new Error("Parser is not ready"));
+  if (state.parser.phase === "failed") return Promise.reject(state.parser.error);
   const id = ++state.requestID;
   const readSize = isArchive(file) ? file.size : Math.min(file.size, maxPreviewBytes);
-  return file.slice(0, readSize).arrayBuffer().then((data) => new Promise((resolve, reject) => {
-    state.pending.set(id, {resolve, reject});
-    state.worker.postMessage({
-      type: "preview",
-      id,
-      file: {name: file.name, type: file.type, size: file.size, lastModified: file.lastModified},
-      data,
-    }, [data]);
-  }));
+  const worker = state.worker;
+  return new Promise((resolve, reject) => {
+    const pending = {resolve, reject};
+    state.pending.set(id, pending);
+    file.slice(0, readSize).arrayBuffer().then((data) => {
+      if (state.pending.get(id) !== pending || state.worker !== worker || state.parser.phase === "failed") {
+        if (state.pending.get(id) === pending) state.pending.delete(id);
+        reject(state.parser.error || new Error("Parser is not ready"));
+        return;
+      }
+      worker.postMessage({
+        type: "preview",
+        id,
+        file: {name: file.name, type: file.type, size: file.size, lastModified: file.lastModified},
+        data,
+      }, [data]);
+    }).catch((error) => {
+      if (state.pending.get(id) === pending) state.pending.delete(id);
+      reject(error);
+    });
+  });
 }
 
 async function selectFile(file) {
@@ -221,11 +404,13 @@ async function selectFile(file) {
   preview.replaceChildren(message("Reading " + displayName(file) + "…"));
   try {
     const result = await parseFile(file);
-    if (state.current !== file) return;
+    if (state.current !== file) return false;
     renderPreview(file, result);
+    return true;
   } catch (error) {
-    if (state.current !== file) return;
+    if (state.current !== file) return false;
     preview.replaceChildren(message(error.message, true));
+    return false;
   }
 }
 
@@ -417,15 +602,166 @@ async function readDirectory(handle, prefix = "") {
   return files;
 }
 
-$("open-file").addEventListener("click", () => fileInput.click());
-$("open-directory").addEventListener("click", async () => {
+async function restoreSources() {
+  const token = beginSourceOperation("restoring");
+  const isCurrent = () => sourceOperationCurrent(token);
+  const stop = () => finishSourceOperation(token);
+  let sources;
+  try {
+    sources = await listSources();
+  } catch (error) {
+    setStatus(`Local history unavailable: ${error.message}`, true);
+    stop();
+    return;
+  }
+  if (!isCurrent()) return;
+  let restored = 0;
+  let permissionNeeded = 0;
+  for (const source of sources.sort((a, b) => b.updatedAt - a.updatedAt)) {
+    if (!isCurrent()) return;
+    try {
+      if (source.kind === "url") {
+        await loadURL(source.url, {persist: false, isCurrent});
+        if (!isCurrent()) return;
+        restored++;
+        continue;
+      }
+      if (source.handle && typeof source.handle.queryPermission === "function" &&
+          await source.handle.queryPermission({mode: "read"}) === "granted") {
+        if (source.kind === "file") {
+          const file = await source.handle.getFile();
+          if (!isCurrent()) return;
+          state.fileSources.set(file, source);
+          addFiles([file]);
+        } else if (source.kind === "directory") {
+          const files = filterSourceFiles(await readDirectory(source.handle), source);
+          if (!isCurrent()) return;
+          for (const file of files) state.fileSources.set(file, source);
+          addFiles(files);
+        }
+        restored++;
+        continue;
+      }
+      if (source.file) {
+        if (source.path && source.path !== source.file.name) {
+          Object.defineProperty(source.file, "_peekdPath", {value: source.path});
+        }
+        state.fileSources.set(source.file, source);
+        addFiles([source.file]);
+        restored++;
+        continue;
+      }
+      if (source.files) {
+        for (const item of source.files) {
+          if (item.path && item.path !== item.file.name) {
+            Object.defineProperty(item.file, "_peekdPath", {value: item.path});
+          }
+        }
+        const files = filterSourceFiles(source.files.map((item) => item.file), source);
+        for (const file of files) state.fileSources.set(file, source);
+        addFiles(files);
+        restored++;
+        continue;
+      }
+
+      if (source.handle) {
+        permissionNeeded++;
+      }
+    } catch (error) {
+      setStatus(`Unable to restore ${source.name || "source"}: ${error.message}`, true);
+    }
+  }
+  if (permissionNeeded) {
+    setStatus(`${permissionNeeded} saved source${permissionNeeded === 1 ? "" : "s"} need permission to reopen.`, true);
+  } else if (restored) {
+    setStatus("Restored recent files");
+  }
+  stop();
+}
+
+function filterSourceFiles(files, source) {
+  const excluded = new Set(source.excludedPaths || []);
+  return files.filter((file) => !excluded.has(file._peekdPath || file.name));
+}
+
+async function openFiles() {
+  const token = beginSourceOperation("loading");
+  if (!window.showOpenFilePicker) {
+    fileInput.click();
+    finishSourceOperation(token);
+    return;
+  }
+  try {
+    const handles = await window.showOpenFilePicker({multiple: true});
+    const files = [];
+    for (const handle of handles) {
+      const file = await handle.getFile();
+      const source = {key: `file:${crypto.randomUUID()}`, kind: "file", handle, file, path: file.name, name: file.name};
+      state.fileSources.set(file, source);
+      if (!sourceOperationCurrent(token)) return;
+      await saveSourceBestEffort(source);
+      if (!sourceOperationCurrent(token)) return;
+      files.push(file);
+    }
+    addFiles(files, true);
+  } finally {
+    finishSourceOperation(token);
+  }
+}
+
+async function openDirectory() {
+  const token = beginSourceOperation("loading");
   if (window.showDirectoryPicker) {
-    try { addFiles(await readDirectory(await window.showDirectoryPicker())); }
-    catch (error) { if (error.name !== "AbortError") setStatus(error.message, true); }
-  } else directoryInput.click();
+    try {
+      const handle = await window.showDirectoryPicker();
+      const source = {key: `directory:${crypto.randomUUID()}`, kind: "directory", handle, name: handle.name};
+      const files = await readDirectory(handle);
+      if (!sourceOperationCurrent(token)) return;
+      source.files = files.map((file) => ({path: file._peekdPath || file.name, file}));
+      for (const file of files) state.fileSources.set(file, source);
+      await saveSourceBestEffort(source);
+      if (!sourceOperationCurrent(token)) return;
+      addFiles(files, true);
+    } finally {
+      finishSourceOperation(token);
+    }
+    return;
+  }
+  directoryInput.click();
+  finishSourceOperation(token);
+}
+$("open-file").addEventListener("click", () => {
+  openFiles().catch((error) => { if (error.name !== "AbortError") setStatus(error.message, true); });
 });
-fileInput.addEventListener("change", () => addFiles(fileInput.files));
-directoryInput.addEventListener("change", () => addFiles(directoryInput.files));
+$("open-directory").addEventListener("click", () => {
+  openDirectory().catch((error) => { if (error.name !== "AbortError") setStatus(error.message, true); });
+});
+async function saveSelectedFiles(files) {
+  const token = beginSourceOperation("loading");
+  addFiles(files, true);
+  try {
+    for (const file of files) {
+      const source = {
+        key: `snapshot:${crypto.randomUUID()}`,
+        kind: "snapshot",
+        file,
+        path: file.webkitRelativePath || file.name,
+        name: file.name,
+      };
+      state.fileSources.set(file, source);
+      if (!sourceOperationCurrent(token)) return;
+      await saveSourceBestEffort(source);
+    }
+  } finally {
+    finishSourceOperation(token);
+  }
+}
+fileInput.addEventListener("change", () => {
+  saveSelectedFiles([...fileInput.files]).catch((error) => setStatus(error.message, true));
+});
+directoryInput.addEventListener("change", () => {
+  saveSelectedFiles([...directoryInput.files]).catch((error) => setStatus(error.message, true));
+});
 $("url-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const url = urlInput.value.trim();
@@ -435,7 +771,12 @@ $("url-form").addEventListener("submit", async (event) => {
     return;
   }
   try {
-    await loadURL(url);
+    const token = beginSourceOperation("loading");
+    try {
+      await loadURL(url, {isCurrent: () => sourceOperationCurrent(token)});
+    } finally {
+      finishSourceOperation(token);
+    }
   } catch (error) {
     setStatus(error.message, true);
   }
@@ -448,16 +789,21 @@ $("clear-files").addEventListener("click", () => {
     URL.revokeObjectURL(state.objectURL);
     state.objectURL = null;
   }
+  const token = beginSourceOperation("clearing");
+  enqueueStorageTask(() => clearSavedSources())
+    .catch((error) => setStatus(`Unable to clear saved sources: ${error.message}`, true))
+    .finally(() => finishSourceOperation(token));
   renderFileList();
   preview.replaceChildren(message("Select a file to preview"));
 });
 document.addEventListener("dragover", (event) => event.preventDefault());
 document.addEventListener("drop", (event) => {
   event.preventDefault();
-  addFiles(event.dataTransfer.files);
+  saveSelectedFiles([...event.dataTransfer.files]).catch((error) => setStatus(error.message, true));
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "/" && document.activeElement !== filter) { event.preventDefault(); filter.focus(); }
 });
 
 startWorker();
+void restoreSources();

@@ -131,9 +131,11 @@ cd wasm
 python3 -m http.server 8091
 ```
 
-Open <http://127.0.0.1:8091/>. Files selected from your computer are parsed
-locally in the browser and are never uploaded. The page also accepts a remote
-file URL; the remote server must allow browser CORS requests.
+Open <http://127.0.0.1:8091/>. Files selected from your computer stay on your
+computer and are parsed locally in the browser. The page also accepts a remote
+file URL; the remote server must allow browser CORS requests. Recent URLs and
+files can be restored after a refresh when browser storage and permissions
+allow it. Clear removes the saved history.
 
 ## Directory download
 

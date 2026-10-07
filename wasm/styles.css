@@ -30,10 +30,13 @@ h1 { font-size: 1.15rem; }
 .sidebar-filter input { width: 100%; border: 1px solid var(--border); border-radius: 7px; padding: .52rem .7rem; color: var(--text); background: var(--bg); }
 .quiet { border: 0; padding: 0; color: var(--muted); background: transparent; }
 .file-list { padding: .35rem; }
-.file-row { width: 100%; display: flex; gap: .55rem; text-align: left; border: 0; border-radius: 6px; background: transparent; }
+.file-row { width: 100%; display: flex; align-items: center; gap: .55rem; padding: .5rem .65rem; text-align: left; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+.file-row:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .file-row.selected { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
 .file-icon { flex: 0 0 1.4rem; text-align: center; }
-.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-remove { flex: 0 0 auto; border: 0; padding: 0 .2rem; color: var(--muted); background: transparent; font-size: 1.1rem; line-height: 1; }
+.file-remove:hover { color: #d44; border-color: transparent; }
 .preview { min-width: 0; overflow: auto; }
 .preview-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 1.35rem; border-bottom: 1px solid var(--border); background: var(--panel); }
 .preview-header h2 { font-size: 1.05rem; overflow-wrap: anywhere; }
