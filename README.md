@@ -3,9 +3,12 @@
 Peekd is a lightweight web file server for quickly browsing and sharing local
 files.
 
+> https://jiacai2050.github.io/peekd/
+
 ![](docs/images/banner.svg)
 
-> https://jiacai2050.github.io/peekd/
+Try it online: <https://jiacai2050.github.io/peekd/wasm/>.
+
 
 ## Highlights
 
@@ -113,29 +116,6 @@ download with:
 ```bash
 curl -C - -O http://127.0.0.1:8090/large-file.iso
 ```
-
-## Browser-local WASM previewer
-
-Peekd also includes a browser-local build that previews selected files without
-uploading them to a server. It supports files and directories, drag-and-drop,
-text/code, Markdown, Org, JSON, XML, CSV/TSV, images, audio/video, PDF, and
-ZIP/TAR archive listings.
-
-Try it online: <https://jiacai2050.github.io/peekd/wasm/>.
-
-Build and serve it over HTTP:
-
-```bash
-make wasm-build
-cd wasm
-python3 -m http.server 8091
-```
-
-Open <http://127.0.0.1:8091/>. Files selected from your computer stay on your
-computer and are parsed locally in the browser. The page also accepts a remote
-file URL; the remote server must allow browser CORS requests. Recent URLs and
-files can be restored after a refresh when browser storage and permissions
-allow it. Clear removes the saved history.
 
 ## Directory download
 

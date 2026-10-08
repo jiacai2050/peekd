@@ -25,3 +25,5 @@ Remote URLs must be accessible through browser CORS. Files selected from your
 computer stay on your computer and are processed locally. Recent URLs and files
 can be restored after a refresh using browser storage. The browser may ask for
 permission again, and Clear removes the saved history.
+
+For technical details on the WebAssembly architecture, data flow, and optimizations, see [WASM Architecture & Implementation](../docs/wasm.md).

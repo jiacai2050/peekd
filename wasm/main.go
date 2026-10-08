@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"syscall/js"
@@ -22,18 +21,6 @@ type previewRequest struct {
 	Data         []byte
 }
 
-type previewResponse struct {
-	Kind     preview.PreviewType    `json:"kind"`
-	Name     string                 `json:"name"`
-	Size     string                 `json:"size"`
-	Modified string                 `json:"modified,omitempty"`
-	Content  string                 `json:"content,omitempty"`
-	HTML     string                 `json:"html,omitempty"`
-	Rows     [][]string             `json:"rows,omitempty"`
-	Entries  []preview.ArchiveEntry `json:"entries,omitempty"`
-	Error    string                 `json:"error,omitempty"`
-}
-
 func main() {
 	js.Global().Set("peekdPreview", js.FuncOf(previewFile))
 	js.Global().Set("peekdVersion", "wasm")
@@ -46,15 +33,14 @@ func main() {
 
 func previewFile(_ js.Value, args []js.Value) any {
 	if len(args) != 1 {
-		return responseJSON(previewResponse{Error: "preview expects one file object"})
+		return map[string]any{"error": "preview expects one file object"}
 	}
 
 	request, err := decodeRequest(args[0])
 	if err != nil {
-		return responseJSON(previewResponse{Error: err.Error()})
+		return map[string]any{"error": err.Error()}
 	}
-	response := makePreview(request)
-	return responseJSON(response)
+	return makePreview(request)
 }
 
 func decodeRequest(value js.Value) (previewRequest, error) {
@@ -63,20 +49,28 @@ func decodeRequest(value js.Value) (previewRequest, error) {
 		return previewRequest{}, fmt.Errorf("file name is required")
 	}
 
+	request := previewRequest{
+		Name:         name,
+		ContentType:  value.Get("type").String(),
+		Size:         valueInt64(value, "size"),
+		LastModified: valueInt64(value, "lastModified"),
+	}
+
+	kind := preview.PreviewTypeByExtension(name)
+	switch kind {
+	case preview.PreviewTypeImage, preview.PreviewTypeAudio, preview.PreviewTypeVideo, preview.PreviewTypePDF:
+		// Media files do not need content bytes in WASM; the browser renders them directly.
+		return request, nil
+	}
+
 	dataValue := value.Get("data")
 	if !dataValue.Truthy() {
 		return previewRequest{}, fmt.Errorf("file data is required")
 	}
 	data := make([]byte, dataValue.Get("byteLength").Int())
 	js.CopyBytesToGo(data, dataValue)
+	request.Data = data
 
-	request := previewRequest{
-		Name:         name,
-		ContentType:  value.Get("type").String(),
-		Size:         valueInt64(value, "size"),
-		LastModified: valueInt64(value, "lastModified"),
-		Data:         data,
-	}
 	if request.Size == 0 {
 		request.Size = int64(len(data))
 	}
@@ -91,13 +85,13 @@ func valueInt64(value js.Value, property string) int64 {
 	return int64(field.Int())
 }
 
-func makePreview(request previewRequest) previewResponse {
-	response := previewResponse{
-		Name: request.Name,
-		Size: preview.FormatFileSize(request.Size),
+func makePreview(request previewRequest) map[string]any {
+	response := map[string]any{
+		"name": request.Name,
+		"size": preview.FormatFileSize(request.Size),
 	}
 	if request.LastModified > 0 {
-		response.Modified = time.UnixMilli(request.LastModified).Format("2006-01-02 15:04:05 -07:00")
+		response["modified"] = time.UnixMilli(request.LastModified).Format("2006-01-02 15:04:05 -07:00")
 	}
 
 	kind := preview.PreviewTypeByExtension(request.Name)
@@ -108,7 +102,7 @@ func makePreview(request previewRequest) previewResponse {
 		}
 		kind = preview.PreviewTypeByContent(contentType)
 	}
-	response.Kind = kind
+	response["kind"] = string(kind)
 
 	switch kind {
 	case preview.PreviewTypeImage, preview.PreviewTypeAudio, preview.PreviewTypeVideo, preview.PreviewTypePDF:
@@ -116,41 +110,55 @@ func makePreview(request previewRequest) previewResponse {
 	case preview.PreviewTypeZIP, preview.PreviewTypeTAR, preview.PreviewTypeTARGZ:
 		entries, err := preview.ReadArchivePreviewBytes(request.Name, request.Data)
 		if err != nil {
-			response.Kind = preview.PreviewTypeNone
-			response.Error = "unable to read archive: " + err.Error()
+			response["kind"] = ""
+			response["error"] = "unable to read archive: " + err.Error()
 			return response
 		}
-		response.Entries = entries
+		jsEntries := js.Global().Get("Array").New(len(entries))
+		for i, e := range entries {
+			obj := js.Global().Get("Object").New()
+			obj.Set("name", e.Name)
+			obj.Set("compressedSize", e.CompressedSize)
+			obj.Set("uncompressedSize", e.UncompressedSize)
+			obj.Set("ratio", e.Ratio)
+			obj.Set("method", e.Method)
+			obj.Set("permissions", e.Permissions)
+			obj.Set("modified", e.Modified)
+			obj.Set("isDir", e.IsDir)
+			jsEntries.SetIndex(i, obj)
+		}
+		response["entries"] = jsEntries
 		return response
 	}
 
 	prepared, preparedKind, err := preview.PrepareBytesPreview(kind, request.Data, maxPreviewSize)
 	if err != nil {
-		response.Error = "unable to prepare preview: " + err.Error()
+		response["error"] = "unable to prepare preview: " + err.Error()
 		return response
 	}
 	if preparedKind == preview.PreviewTypeNone {
-		response.Kind = preview.PreviewTypeNone
+		response["kind"] = ""
 		return response
 	}
-	response.Kind = preparedKind
-	response.Content = prepared.Formatted
-	response.Rows = prepared.Rows
-	if preparedKind == preview.PreviewTypeHTML {
-		response.HTML = prepared.Formatted
-		response.Content = ""
-	}
-	if preparedKind == preview.PreviewTypeMarkdown || preparedKind == preview.PreviewTypeOrg {
-		response.HTML = prepared.Formatted
-		response.Content = ""
+	response["kind"] = string(preparedKind)
+
+	switch preparedKind {
+	case preview.PreviewTypeHTML, preview.PreviewTypeMarkdown, preview.PreviewTypeOrg:
+		response["html"] = prepared.Formatted
+	case preview.PreviewTypeCSV, preview.PreviewTypeTSV:
+		if prepared.Rows != nil {
+			jsRows := js.Global().Get("Array").New(len(prepared.Rows))
+			for i, row := range prepared.Rows {
+				jsRow := js.Global().Get("Array").New(len(row))
+				for j, cell := range row {
+					jsRow.SetIndex(j, cell)
+				}
+				jsRows.SetIndex(i, jsRow)
+			}
+			response["rows"] = jsRows
+		}
+	default:
+		response["content"] = prepared.Formatted
 	}
 	return response
-}
-
-func responseJSON(response previewResponse) string {
-	data, err := json.Marshal(response)
-	if err != nil {
-		return `{"error":"unable to encode preview response"}`
-	}
-	return string(data)
 }

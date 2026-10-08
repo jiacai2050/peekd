@@ -37,10 +37,8 @@ func formatPreviewContent(preview PreviewType, content []byte) (PreparedTextPrev
 	case PreviewTypeOrg:
 		prepared.Formatted, err = RenderOrg(content)
 	case PreviewTypeCSV:
-		prepared.Formatted = string(content)
 		prepared.Rows, err = ParseCSVPreview(content, ',')
 	case PreviewTypeTSV:
-		prepared.Formatted = string(content)
 		prepared.Rows, err = ParseCSVPreview(content, '\t')
 	default:
 		return prepared, nil

@@ -152,7 +152,7 @@ function addFiles(files, selectFirst = false) {
     state.files.set(name, file);
   }
   renderFileList();
-  if (!state.current && state.files.size) selectFile([...state.files.values()][0]);
+  if (!state.current && state.files.size) selectFile(state.files.values().next().value);
   else if (selectFirst && files.length) selectFile(files[0]);
 }
 
@@ -223,6 +223,7 @@ function renderFileList() {
   }
   for (const [name, file] of files) {
     const row = document.createElement("div");
+    row.__peekdFile = file;
     row.className = "file-row";
     row.classList.toggle("selected", state.current === file);
     row.setAttribute("role", "button");
@@ -350,7 +351,7 @@ function startWorker() {
     const pending = state.pending.get(message.id);
     if (!pending) return;
     state.pending.delete(message.id);
-    pending.resolve(JSON.parse(message.result));
+    pending.resolve(message.result);
   });
   setStatus("Loading parser…");
   state.worker.addEventListener("error", (event) => {
@@ -371,6 +372,7 @@ function parseFile(file) {
       modified: file.lastModified ? formatModified(file.lastModified) : "",
     });
   }
+
   if (!state.worker) return Promise.reject(new Error("Parser is not ready"));
   if (state.parser.phase === "failed") return Promise.reject(state.parser.error);
   const id = ++state.requestID;
@@ -398,9 +400,22 @@ function parseFile(file) {
   });
 }
 
+function updateSelection(file) {
+  for (const row of fileList.querySelectorAll(".file-row")) {
+    row.classList.toggle("selected", row.__peekdFile === file);
+  }
+}
+
 async function selectFile(file) {
+  if (state.current === file && preview.querySelector(".preview-header")) return true;
+
+  for (const [id, pending] of state.pending) {
+    pending.reject(new Error("superseded"));
+  }
+  state.pending.clear();
+
   state.current = file;
-  renderFileList();
+  updateSelection(file);
   preview.replaceChildren(message("Reading " + displayName(file) + "…"));
   try {
     const result = await parseFile(file);
@@ -590,13 +605,17 @@ function copyButton(value) {
 
 async function readDirectory(handle, prefix = "") {
   const files = [];
-  for await (const [name, child] of handle.entries()) {
-    if (child.kind === "file") {
-      const file = await child.getFile();
-      Object.defineProperty(file, "_peekdPath", {value: prefix + name});
-      files.push(file);
-    } else {
-      files.push(...await readDirectory(child, prefix + name + "/"));
+  const queue = [{handle, prefix}];
+  while (queue.length) {
+    const current = queue.shift();
+    for await (const [name, child] of current.handle.entries()) {
+      if (child.kind === "file") {
+        const file = await child.getFile();
+        Object.defineProperty(file, "_peekdPath", {value: current.prefix + name});
+        files.push(file);
+      } else if (child.kind === "directory") {
+        queue.push({handle: child, prefix: current.prefix + name + "/"});
+      }
     }
   }
   return files;
@@ -617,6 +636,7 @@ async function restoreSources() {
   if (!isCurrent()) return;
   let restored = 0;
   let permissionNeeded = 0;
+  const allRestoredFiles = [];
   for (const source of sources.sort((a, b) => b.updatedAt - a.updatedAt)) {
     if (!isCurrent()) return;
     try {
@@ -632,34 +652,30 @@ async function restoreSources() {
           const file = await source.handle.getFile();
           if (!isCurrent()) return;
           state.fileSources.set(file, source);
-          addFiles([file]);
+          allRestoredFiles.push(file);
         } else if (source.kind === "directory") {
           const files = filterSourceFiles(await readDirectory(source.handle), source);
           if (!isCurrent()) return;
           for (const file of files) state.fileSources.set(file, source);
-          addFiles(files);
+          allRestoredFiles.push(...files);
         }
         restored++;
         continue;
       }
       if (source.file) {
-        if (source.path && source.path !== source.file.name) {
-          Object.defineProperty(source.file, "_peekdPath", {value: source.path});
-        }
+        setPeekdPath(source.file, source.path);
         state.fileSources.set(source.file, source);
-        addFiles([source.file]);
+        allRestoredFiles.push(source.file);
         restored++;
         continue;
       }
       if (source.files) {
         for (const item of source.files) {
-          if (item.path && item.path !== item.file.name) {
-            Object.defineProperty(item.file, "_peekdPath", {value: item.path});
-          }
+          setPeekdPath(item.file, item.path);
         }
         const files = filterSourceFiles(source.files.map((item) => item.file), source);
         for (const file of files) state.fileSources.set(file, source);
-        addFiles(files);
+        allRestoredFiles.push(...files);
         restored++;
         continue;
       }
@@ -671,12 +687,24 @@ async function restoreSources() {
       setStatus(`Unable to restore ${source.name || "source"}: ${error.message}`, true);
     }
   }
+  if (allRestoredFiles.length) {
+    addFiles(allRestoredFiles);
+  }
   if (permissionNeeded) {
     setStatus(`${permissionNeeded} saved source${permissionNeeded === 1 ? "" : "s"} need permission to reopen.`, true);
   } else if (restored) {
     setStatus("Restored recent files");
   }
   stop();
+}
+
+function setPeekdPath(file, path) {
+  if (!file || !path || path === file.name) return;
+  try {
+    Object.defineProperty(file, "_peekdPath", {value: path, configurable: true});
+  } catch (_) {
+    file._peekdPath = path;
+  }
 }
 
 function filterSourceFiles(files, source) {
@@ -757,10 +785,10 @@ async function saveSelectedFiles(files) {
   }
 }
 fileInput.addEventListener("change", () => {
-  saveSelectedFiles([...fileInput.files]).catch((error) => setStatus(error.message, true));
+  saveSelectedFiles(Array.from(fileInput.files)).catch((error) => setStatus(error.message, true));
 });
 directoryInput.addEventListener("change", () => {
-  saveSelectedFiles([...directoryInput.files]).catch((error) => setStatus(error.message, true));
+  saveSelectedFiles(Array.from(directoryInput.files)).catch((error) => setStatus(error.message, true));
 });
 $("url-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -781,7 +809,11 @@ $("url-form").addEventListener("submit", async (event) => {
     setStatus(error.message, true);
   }
 });
-filter.addEventListener("input", renderFileList);
+let filterTimer;
+filter.addEventListener("input", () => {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(renderFileList, 150);
+});
 $("clear-files").addEventListener("click", () => {
   state.files.clear();
   state.current = null;
@@ -799,7 +831,7 @@ $("clear-files").addEventListener("click", () => {
 document.addEventListener("dragover", (event) => event.preventDefault());
 document.addEventListener("drop", (event) => {
   event.preventDefault();
-  saveSelectedFiles([...event.dataTransfer.files]).catch((error) => setStatus(error.message, true));
+  saveSelectedFiles(Array.from(event.dataTransfer.files)).catch((error) => setStatus(error.message, true));
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "/" && document.activeElement !== filter) { event.preventDefault(); filter.focus(); }
