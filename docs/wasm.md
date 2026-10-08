@@ -149,8 +149,8 @@ The WASM build script (`wasm/build.sh`) applies multi-stage optimizations:
    - `-s`: Strips symbol tables.
    - `-w`: Strips DWARF debug information.
 2. **Binaryen Optimization (`wasm-opt`)**:
-   If `wasm-opt` is installed, it runs an `-O2` optimization pass:
+   If `wasm-opt` is installed, it runs an `-O2 --all-features` optimization pass:
    ```sh
-   wasm-opt -O2 peekd.wasm -o peekd.wasm
+   wasm-opt -O2 --all-features peekd.wasm -o peekd.wasm
    ```
-   This reduces binary size from ~9.4 MB down to ~8.8 MB and improves execution performance.
+   This reduces binary size from ~8.9 MB down to ~8.6 MB and improves execution performance.
